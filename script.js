@@ -135,7 +135,7 @@ class Calculator {
   }
 
   loadTheme() {
-    const savedTheme = localStorage.getItem('calculatorTheme') || 'pookie';
+    const savedTheme = localStorage.getItem('calculatorTheme') || 'light';
     if (savedTheme === 'dark') {
       document.body.classList.add('dark-mode');
     } else if (savedTheme === 'pookie') {
