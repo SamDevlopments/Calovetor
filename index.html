@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>iOS 17 Calovetor</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+
+<body>
+  <div class="calculator">
+    <div class="display-panel">
+      <div class="header">
+        <button class="corner-btn hamburger" id="menu-btn">☰</button>
+        <button class="corner-btn ribbon" id="ribbon-btn"><img src="icons/pookie_mode_button.png"
+            alt="Pookie Mode"></button>
+      </div>
+      <div class="display">
+        <div class="history"></div>
+        <div class="current-input">0</div>
+      </div>
+    </div>
+    <div class="panel-resizer" id="panel-resizer"></div>
+    <div class="buttons-panel">
+      <div class="buttons">
+        <button class="btn function" data-action="memory-recall">MR</button>
+        <button class="btn function" data-action="memory-clear">MC</button>
+        <button class="btn function" data-action="memory-add">M+</button>
+        <button class="btn function" data-action="memory-subtract">M-</button>
+
+        <button class="btn function" data-action="clear">AC</button>
+        <button class="btn function" data-action="toggle">±</button>
+        <button class="btn function" data-action="percent">%</button>
+        <button class="btn operator" data-operator="÷">
+          <div class="operator-symbol">÷</div>
+        </button>
+
+        <button class="btn number" data-number="7">7</button>
+        <button class="btn number" data-number="8">8</button>
+        <button class="btn number" data-number="9">9</button>
+        <button class="btn operator" data-operator="×">
+          <div class="operator-symbol">×</div>
+        </button>
+
+        <button class="btn number" data-number="4">4</button>
+        <button class="btn number" data-number="5">5</button>
+        <button class="btn number" data-number="6">6</button>
+        <button class="btn operator" data-operator="−">
+          <div class="operator-symbol">−</div>
+        </button>
+
+        <button class="btn number" data-number="1">1</button>
+        <button class="btn number" data-number="2">2</button>
+        <button class="btn number" data-number="3">3</button>
+        <button class="btn operator" data-operator="+">
+          <div class="operator-symbol">+</div>
+        </button>
+
+        <button class="btn number zero" data-number="0">0</button>
+        <button class="btn number" data-number=".">.</button>
+        <button class="btn operator equals" data-operator="=">
+          <div class="operator-symbol">=</div>
+        </button>
+      </div>
+      <div class="scientific-buttons">
+        <button class="btn scientific" data-action="rad">Rad</button>
+        <button class="btn scientific" data-action="second">2nd</button>
+        <button class="btn scientific" data-action="factorial">x!</button>
+        <button class="btn scientific" data-action="reciprocal">1/x</button>
+        <button class="btn scientific" data-action="sin">sin</button>
+        <button class="btn scientific" data-action="ln">ln</button>
+        <button class="btn scientific" data-action="pi">π</button>
+        <button class="btn scientific" data-action="cos">cos</button>
+        <button class="btn scientific" data-action="log">log</button>
+        <button class="btn scientific" data-action="euler">e</button>
+        <button class="btn scientific" data-action="tan">tan</button>
+        <button class="btn scientific" data-action="sqrt">√</button>
+        <button class="btn scientific" data-action="square">x²</button>
+        <button class="btn scientific" data-action="exp">EXP</button>
+        <button class="btn scientific" data-action="power">xʸ</button>
+        <button class="btn scientific" data-action="open-paren">(</button>
+        <button class="btn scientific" data-action="close-paren">)</button>
+        <button class="btn scientific" data-action="abs">|x|</button>
+      </div>
+    </div>
+  </div>
+  <script src="script.js"></script>
+</body>
+
+</html>
