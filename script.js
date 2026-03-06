@@ -2449,6 +2449,7 @@ document.addEventListener('DOMContentLoaded', () => {
       { text: 'History', action: 'history', icon: 'fa-clock-rotate-left', color: 'var(--accent)' },
       { text: 'Settings', action: 'settings', icon: 'fa-sliders', color: '#636366' },
       { text: 'Aesthetic', action: 'aesthetic', icon: 'fa-palette', color: '#ff69b4' },
+      { text: 'Sounds', action: 'sounds', icon: 'fa-volume-up', color: '#007AFF' },
     ];
 
     mainItems.forEach(option => {
@@ -2559,6 +2560,9 @@ document.addEventListener('DOMContentLoaded', () => {
         break;
       case 'aesthetic':
         showAestheticMenu();
+        break;
+      case 'sounds':
+        showSoundsMenu();
         break;
     }
   }
@@ -3361,9 +3365,7 @@ document.addEventListener('DOMContentLoaded', () => {
     sidebar.classList.add('settings-sidebar');
 
     const sidebarItems = [
-      { id: 'appearance', icon: 'fa-palette', label: 'Appearance' },
-      { id: 'sound', icon: 'fa-volume-up', label: 'Sound & Haptics' },
-      { id: 'interaction', icon: 'fa-hand-pointer', label: 'Gestures' }
+      { id: 'appearance', icon: 'fa-palette', label: 'Appearance' }
     ];
 
     // Content Area
@@ -3404,56 +3406,6 @@ document.addEventListener('DOMContentLoaded', () => {
           </select>
         </div>
       </div>
-
-      <!-- Sound & Haptics Section -->
-      <div class="settings-section" id="section-sound">
-        <div class="settings-section-title">Sound & Haptics</div>
-        <div class="macos-settings-row">
-          <div class="row-info">
-            <div class="row-title">Sound Effects</div>
-            <div class="row-subtitle">Play sounds when pressing buttons.</div>
-          </div>
-          <label class="macos-switch">
-            <input type="checkbox" class="sound-toggle" ${calculator.soundEnabled ? 'checked' : ''}>
-            <span class="macos-slider"></span>
-          </label>
-        </div>
-        <div class="macos-settings-row">
-          <div class="row-info">
-            <div class="row-title">UI Animations & Sounds</div>
-            <div class="row-subtitle">Enable specialized interface audio.</div>
-          </div>
-          <label class="macos-switch">
-            <input type="checkbox" class="ui-sounds-toggle" ${calculator.uiSoundsEnabled !== 'none' ? 'checked' : ''}>
-            <span class="macos-slider"></span>
-          </label>
-        </div>
-        <div class="macos-settings-row">
-          <div class="row-info">
-            <div class="row-title">Haptic Feedback</div>
-            <div class="row-subtitle">Vibrate on interactions (Mobile).</div>
-          </div>
-          <label class="macos-switch">
-            <input type="checkbox" class="vibration-toggle" ${calculator.vibrationEnabled ? 'checked' : ''}>
-            <span class="macos-slider"></span>
-          </label>
-        </div>
-      </div>
-
-      <!-- Gestures Section -->
-      <div class="settings-section" id="section-interaction">
-        <div class="settings-section-title">Gestures & Interaction</div>
-        <div class="macos-settings-row">
-          <div class="row-info">
-            <div class="row-title">Touch Gestures</div>
-            <div class="row-subtitle">Swipe on display to delete digits.</div>
-          </div>
-          <label class="macos-switch">
-            <input type="checkbox" class="gestures-toggle" ${calculator.gesturesEnabled ? 'checked' : ''}>
-            <span class="macos-slider"></span>
-          </label>
-        </div>
-      </div>
     `;
 
     windowBody.appendChild(sidebar);
@@ -3472,32 +3424,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // Event Listeners for controls
     const themeSelect = content.querySelector('.theme-select');
     themeSelect.addEventListener('change', (e) => changeTheme(e.target.value));
-
-    const soundToggle = content.querySelector('.sound-toggle');
-    soundToggle.addEventListener('change', (e) => {
-      calculator.soundEnabled = e.target.checked;
-      localStorage.setItem('calculatorSound', calculator.soundEnabled);
-    });
-
-    const uiSoundsToggle = content.querySelector('.ui-sounds-toggle');
-    uiSoundsToggle.addEventListener('change', (e) => {
-      calculator.uiSoundsEnabled = e.target.checked ? 'all' : 'none';
-      localStorage.setItem('calculatorUISounds', calculator.uiSoundsEnabled);
-    });
-
-    const vibrationToggle = content.querySelector('.vibration-toggle');
-    vibrationToggle.addEventListener('change', (e) => {
-      calculator.vibrationEnabled = e.target.checked;
-      localStorage.setItem('calculatorVibration', calculator.vibrationEnabled);
-    });
-
-    const gesturesToggle = content.querySelector('.gestures-toggle');
-    gesturesToggle.addEventListener('change', (e) => {
-      calculator.gesturesEnabled = e.target.checked;
-      localStorage.setItem('calculatorGestures', calculator.gesturesEnabled);
-      if (calculator.gesturesEnabled) calculator.enableGestures();
-      else calculator.disableGestures();
-    });
 
     // Close on overlay click
     settingsOverlay.addEventListener('click', (e) => {
@@ -3689,6 +3615,185 @@ document.addEventListener('DOMContentLoaded', () => {
     // Close on overlay click
     aestheticOverlay.addEventListener('click', (e) => {
       if (e.target === aestheticOverlay) closeAestheticMenu();
+    });
+  }
+
+  function showSoundsMenu() {
+    // Create sounds overlay
+    const soundsOverlay = document.createElement('div');
+    soundsOverlay.classList.add('settings-overlay');
+    if (calculator.pookieMode) soundsOverlay.classList.add('pookie-active');
+
+    const soundsContainer = document.createElement('div');
+    soundsContainer.classList.add('settings-container');
+
+    // MacOS Title Bar
+    const titleBar = document.createElement('div');
+    titleBar.classList.add('macos-title-bar');
+
+    const trafficLights = document.createElement('div');
+    trafficLights.classList.add('macos-traffic-lights');
+    trafficLights.innerHTML = `
+      <div class="traffic-light red"></div>
+      <div class="traffic-light yellow"></div>
+      <div class="traffic-light green"></div>
+    `;
+
+    const closeSoundsMenu = () => {
+      winLogic.stopPhysics();
+      soundsOverlay.classList.remove('active');
+      setTimeout(() => soundsOverlay.remove(), 300);
+    };
+
+    const title = document.createElement('div');
+    title.classList.add('macos-title');
+    title.textContent = 'Sounds';
+
+    titleBar.appendChild(trafficLights);
+    titleBar.appendChild(title);
+
+    const soundsIconSVG = `
+      <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+        <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+      </svg>
+    `;
+
+    const winLogic = initMacOSWindow(soundsContainer, soundsOverlay, titleBar, closeSoundsMenu, soundsIconSVG);
+
+    // Sounds Window Body
+    const windowBody = document.createElement('div');
+    windowBody.classList.add('settings-window-body');
+
+    // Sidebar
+    const sidebar = document.createElement('div');
+    sidebar.classList.add('settings-sidebar');
+
+    const sidebarItems = [
+      { id: 'sounds', icon: 'fa-volume-up', label: 'Sounds' },
+      { id: 'gestures', icon: 'fa-hand-pointer', label: 'Gestures' }
+    ];
+
+    // Content Area
+    const content = document.createElement('div');
+    content.classList.add('settings-content');
+
+    sidebarItems.forEach((item, index) => {
+      const sbItem = document.createElement('div');
+      sbItem.classList.add('sidebar-item');
+      if (index === 0) sbItem.classList.add('active');
+      sbItem.innerHTML = `<i class="fas ${item.icon}"></i><span>${item.label}</span>`;
+
+      sbItem.addEventListener('click', () => {
+        document.querySelectorAll('.sidebar-item').forEach(i => i.classList.remove('active'));
+        document.querySelectorAll('.settings-section').forEach(s => s.classList.remove('active'));
+        sbItem.classList.add('active');
+        document.getElementById(`section-${item.id}`).classList.add('active');
+      });
+
+      sidebar.appendChild(sbItem);
+    });
+
+    // Content sections
+    content.innerHTML = `
+      <!-- Sounds Section -->
+      <div class="settings-section active" id="section-sounds">
+        <div class="settings-section-title">Sounds</div>
+        <div class="aesthetic-subsection">
+          <div class="macos-settings-row">
+            <div class="row-info">
+              <div class="row-title">Sound Effects</div>
+              <div class="row-subtitle">Play sounds when pressing buttons.</div>
+            </div>
+            <label class="macos-switch">
+              <input type="checkbox" class="sound-toggle" ${calculator.soundEnabled ? 'checked' : ''}>
+              <span class="macos-slider"></span>
+            </label>
+          </div>
+          <div class="macos-settings-row">
+            <div class="row-info">
+              <div class="row-title">UI Animations & Sounds</div>
+              <div class="row-subtitle">Enable specialized interface audio.</div>
+            </div>
+            <label class="macos-switch">
+              <input type="checkbox" class="ui-sounds-toggle" ${calculator.uiSoundsEnabled !== 'none' ? 'checked' : ''}>
+              <span class="macos-slider"></span>
+            </label>
+          </div>
+          <div class="macos-settings-row">
+            <div class="row-info">
+              <div class="row-title">Haptic Feedback</div>
+              <div class="row-subtitle">Vibrate on button presses.</div>
+            </div>
+            <label class="macos-switch">
+              <input type="checkbox" class="vibration-toggle" ${calculator.vibrationEnabled ? 'checked' : ''}>
+              <span class="macos-slider"></span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <!-- Gestures Section -->
+      <div class="settings-section" id="section-gestures">
+        <div class="settings-section-title">Gestures</div>
+        <div class="aesthetic-subsection">
+          <div class="macos-settings-row">
+            <div class="row-info">
+              <div class="row-title">Touch Gestures</div>
+              <div class="row-subtitle">Swipe on display to delete digits.</div>
+            </div>
+            <label class="macos-switch">
+              <input type="checkbox" class="gestures-toggle" ${calculator.gesturesEnabled ? 'checked' : ''}>
+              <span class="macos-slider"></span>
+            </label>
+          </div>
+        </div>
+      </div>
+    `;
+
+    // Add event listeners for toggles
+    const soundToggle = content.querySelector('.sound-toggle');
+    soundToggle.addEventListener('change', (e) => {
+      calculator.soundEnabled = e.target.checked;
+      localStorage.setItem('calculatorSound', calculator.soundEnabled);
+    });
+
+    const uiSoundsToggle = content.querySelector('.ui-sounds-toggle');
+    uiSoundsToggle.addEventListener('change', (e) => {
+      calculator.uiSoundsEnabled = e.target.checked ? 'all' : 'none';
+      localStorage.setItem('calculatorUISounds', calculator.uiSoundsEnabled);
+    });
+
+    const vibrationToggle = content.querySelector('.vibration-toggle');
+    vibrationToggle.addEventListener('change', (e) => {
+      calculator.vibrationEnabled = e.target.checked;
+      localStorage.setItem('calculatorVibration', calculator.vibrationEnabled);
+    });
+
+    const gesturesToggle = content.querySelector('.gestures-toggle');
+    gesturesToggle.addEventListener('change', (e) => {
+      calculator.gesturesEnabled = e.target.checked;
+      localStorage.setItem('calculatorGestures', calculator.gesturesEnabled);
+      if (calculator.gesturesEnabled) calculator.enableGestures();
+      else calculator.disableGestures();
+    });
+
+    windowBody.appendChild(sidebar);
+    windowBody.appendChild(content);
+
+    soundsContainer.appendChild(titleBar);
+    soundsContainer.appendChild(windowBody);
+    soundsOverlay.appendChild(soundsContainer);
+    document.body.appendChild(soundsOverlay);
+
+    // Animate in
+    setTimeout(() => {
+      soundsOverlay.classList.add('active');
+    }, 10);
+
+    // Close on overlay click
+    soundsOverlay.addEventListener('click', (e) => {
+      if (e.target === soundsOverlay) closeSoundsMenu();
     });
   }
 
