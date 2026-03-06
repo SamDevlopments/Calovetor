@@ -3585,9 +3585,13 @@ document.addEventListener('DOMContentLoaded', () => {
     sidebar.classList.add('settings-sidebar');
 
     const sidebarItems = [
+      { id: 'layout', icon: 'fa-layer-group', label: 'Layout' },
+      { id: 'colors', icon: 'fa-palette', label: 'Colors' },
       { id: 'buttons', icon: 'fa-square', label: 'Buttons' },
-      { id: 'looks', icon: 'fa-palette', label: 'Looks' },
-      { id: 'effects', icon: 'fa-magic', label: 'Effects' }
+      { id: 'typography', icon: 'fa-font', label: 'Typography' },
+      { id: 'effects', icon: 'fa-magic', label: 'Effects' },
+      { id: 'themes', icon: 'fa-swatchbook', label: 'Themes' },
+      { id: 'advanced', icon: 'fa-cog', label: 'Advanced' }
     ];
 
     // Content Area
@@ -3612,23 +3616,57 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Content sections
     content.innerHTML = `
-      <!-- Empty Content -->
-      <div class="settings-section active" id="section-buttons">
+      <!-- Layout Section -->
+      <div class="settings-section active" id="section-layout">
+        <div class="settings-section-title">Layout</div>
+        <div class="aesthetic-subsection">
+          <p style="color: #8e8e93; text-align: center; padding: 40px;">Coming soon...</p>
+        </div>
+      </div>
+
+      <!-- Colors Section -->
+      <div class="settings-section" id="section-colors">
+        <div class="settings-section-title">Colors</div>
+        <div class="aesthetic-subsection">
+          <p style="color: #8e8e93; text-align: center; padding: 40px;">Coming soon...</p>
+        </div>
+      </div>
+
+      <!-- Buttons Section -->
+      <div class="settings-section" id="section-buttons">
         <div class="settings-section-title">Buttons</div>
         <div class="aesthetic-subsection">
           <p style="color: #8e8e93; text-align: center; padding: 40px;">Coming soon...</p>
         </div>
       </div>
 
-      <div class="settings-section" id="section-looks">
-        <div class="settings-section-title">Looks</div>
+      <!-- Typography Section -->
+      <div class="settings-section" id="section-typography">
+        <div class="settings-section-title">Typography</div>
         <div class="aesthetic-subsection">
           <p style="color: #8e8e93; text-align: center; padding: 40px;">Coming soon...</p>
         </div>
       </div>
 
+      <!-- Effects Section -->
       <div class="settings-section" id="section-effects">
         <div class="settings-section-title">Effects</div>
+        <div class="aesthetic-subsection">
+          <p style="color: #8e8e93; text-align: center; padding: 40px;">Coming soon...</p>
+        </div>
+      </div>
+
+      <!-- Themes Section -->
+      <div class="settings-section" id="section-themes">
+        <div class="settings-section-title">Themes</div>
+        <div class="aesthetic-subsection">
+          <p style="color: #8e8e93; text-align: center; padding: 40px;">Coming soon...</p>
+        </div>
+      </div>
+
+      <!-- Advanced Section -->
+      <div class="settings-section" id="section-advanced">
+        <div class="settings-section-title">Advanced</div>
         <div class="aesthetic-subsection">
           <p style="color: #8e8e93; text-align: center; padding: 40px;">Coming soon...</p>
         </div>
@@ -3733,5 +3771,3 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 });
-
-
