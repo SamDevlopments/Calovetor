@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Theme System Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: #f0f0f0;
+        }
+        .test-container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .theme-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+        .theme-card {
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            padding: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-align: center;
+        }
+        .theme-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+        .theme-card.active {
+            border-color: #007bff;
+            background: #e7f3ff;
+        }
+        .theme-colors {
+            width: 100%;
+            height: 60px;
+            border-radius: 4px;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .theme-name {
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 5px;
+        }
+        .calculator-preview {
+            background: var(--calculator-bg, #fff);
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 20px 0;
+            min-height: 200px;
+        }
+        .display {
+            background: var(--display-bg, #000);
+            color: var(--display-text, #fff);
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            text-align: right;
+            font-size: 24px;
+        }
+        .buttons {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 5px;
+        }
+        .btn {
+            padding: 15px;
+            border: none;
+            border-radius: 4px;
+            background: var(--button-bg, #f0f0f0);
+            color: var(--button-text, #000);
+            cursor: pointer;
+        }
+        .btn.operator {
+            background: var(--operator-bg, #ff9f0a);
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>Figma-Powered Theme System Test</h1>
+        <p>Testing all 100 themes from the Figma palette collection.</p>
+        
+        <div class="calculator-preview">
+            <div class="display">0</div>
+            <div class="buttons">
+                <button class="btn">7</button>
+                <button class="btn">8</button>
+                <button class="btn">9</button>
+                <button class="btn operator">÷</button>
+                <button class="btn">4</button>
+                <button class="btn">5</button>
+                <button class="btn">6</button>
+                <button class="btn operator">×</button>
+                <button class="btn">1</button>
+                <button class="btn">2</button>
+                <button class="btn">3</button>
+                <button class="btn operator">−</button>
+                <button class="btn">0</button>
+                <button class="btn">.</button>
+                <button class="btn">=</button>
+                <button class="btn operator">+</button>
+            </div>
+        </div>
+        
+        <div class="themes-grid" id="themesGrid">
+            <!-- Themes will be populated here -->
+        </div>
+    </div>
+
+    <script src="themes_data.js"></script>
+    <script>
+        // Test the theme system
+        function testThemes() {
+            const themesGrid = document.getElementById('themesGrid');
+            const root = document.documentElement;
+            
+            // Populate theme cards
+            Object.keys(figmaThemes).forEach(themeName => {
+                const colors = figmaThemes[themeName].colors;
+                const themeCard = document.createElement('div');
+                themeCard.className = 'theme-card';
+                themeCard.dataset.theme = themeName;
+                
+                // Create color preview
+                const colorPreview = document.createElement('div');
+                colorPreview.className = 'theme-colors';
+                colorPreview.style.background = `linear-gradient(135deg, ${colors.join(', ')})`;
+                
+                const themeNameEl = document.createElement('div');
+                themeNameEl.className = 'theme-name';
+                themeNameEl.textContent = themeName;
+                
+                themeCard.appendChild(colorPreview);
+                themeCard.appendChild(themeNameEl);
+                
+                // Add click handler
+                themeCard.addEventListener('click', function() {
+                    // Remove active class from all cards
+                    document.querySelectorAll('.theme-card').forEach(c => c.classList.remove('active'));
+                    // Add active class to clicked card
+                    this.classList.add('active');
+                    // Apply theme
+                    applyTheme(themeName);
+                });
+                
+                themesGrid.appendChild(themeCard);
+            });
+            
+            // Apply first theme by default
+            const firstTheme = Object.keys(figmaThemes)[0];
+            applyTheme(firstTheme);
+            document.querySelector(`[data-theme="${firstTheme}"]`).classList.add('active');
+        }
+        
+        function applyTheme(themeName) {
+            const theme = figmaThemes[themeName];
+            if (!theme) return;
+            
+            const colors = theme.colors;
+            const cssVars = generateThemeCSS(themeName, colors);
+            
+            // Apply CSS custom properties
+            Object.keys(cssVars).forEach(varName => {
+                root.style.setProperty(varName, cssVars[varName]);
+            });
+            
+            console.log(`Applied theme: ${themeName}`, colors);
+        }
+        
+        // Initialize when DOM is ready
+        document.addEventListener('DOMContentLoaded', testThemes);
+    </script>
+</body>
+</html>

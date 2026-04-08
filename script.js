@@ -23,10 +23,58 @@ class Calculator {
     setTimeout(() => {
       this.loadTheme();
       this.loadSounds();
+      this.applyInputMode();
       if (this.gesturesEnabled) {
         this.enableGestures();
       }
     }, 50);
+  }
+
+  applyInputMode() {
+    const mode = localStorage.getItem('calculatorInputMode') || 'mixed';
+    const calculator = document.querySelector('.calculator');
+    if (!calculator) return;
+    
+    const buttons = calculator.querySelectorAll('.btn');
+    
+    // Reset all input methods first
+    buttons.forEach(btn => {
+      btn.style.pointerEvents = 'auto'; // Enable mouse/touch
+      btn.tabIndex = '0'; // Enable keyboard
+    });
+    
+    // Apply mode-specific restrictions
+    switch(mode) {
+      case 'mixed':
+        // All inputs work - nothing to disable
+        break;
+        
+      case 'keyboard':
+        // Disable mouse/touch
+        buttons.forEach(btn => {
+          btn.style.pointerEvents = 'none';
+        });
+        break;
+        
+      case 'mouse':
+        // Disable keyboard
+        buttons.forEach(btn => {
+          btn.tabIndex = '-1';
+        });
+        break;
+        
+      case 'touch':
+        // Check if in landscape mode
+        const isLandscape = window.innerWidth > window.innerHeight;
+        if (isLandscape) {
+          // Disable keyboard and mouse in landscape mode
+          buttons.forEach(btn => {
+            btn.style.pointerEvents = 'none';
+            btn.tabIndex = '-1';
+          });
+        }
+        break;
+    }
   }
 
   loadSounds() {
@@ -38,7 +86,8 @@ class Calculator {
       'memory.mp3',
       'equals.mp3',
       'clear.mp3',
-      'gestures.mp3'
+      'gestures.mp3',
+      'error.mp3'
     ]);
 
     // Load pookie mode sounds (including activation sound)
@@ -50,7 +99,8 @@ class Calculator {
       'equals.mp3',
       'clear.mp3',
       'gestures.mp3',
-      'pookie-activation.mp3'
+      'pookie-activation.mp3',
+      'error.mp3'
     ]);
   }
 
@@ -78,6 +128,12 @@ class Calculator {
 
     if (this.sounds[mode] && this.sounds[mode][soundFile]) {
       const audio = this.sounds[mode][soundFile];
+
+
+
+
+
+
 
       // Reset audio to beginning for multiple rapid clicks
       audio.currentTime = 0;
@@ -136,13 +192,46 @@ class Calculator {
     }
   }
 
+  playErrorSound() {
+    if (!this.soundEnabled) return;
+
+    const mode = this.pookieMode ? 'pookie' : 'default';
+    const errorSound = this.sounds[mode]['error.mp3'];
+
+    if (errorSound) {
+      errorSound.currentTime = 0;
+      errorSound.play().catch(e => {
+        console.warn('Error sound playback failed:', e);
+        this.playFallbackBeep();
+      });
+    } else {
+      // Fallback beep if error sound fails
+      this.playFallbackBeep();
+    }
+  }
+
   loadTheme() {
     const savedTheme = localStorage.getItem('calculatorTheme') || 'light';
     if (savedTheme === 'dark') {
       document.body.classList.add('dark-mode');
     } else if (savedTheme === 'pookie') {
       this.pookieMode = true;
-      document.querySelector('.calculator').classList.add('pookie-mode');
+      const calculator = document.querySelector('.calculator');
+      if (calculator) {
+        // Apply the fixed dreamy palette first
+        document.documentElement.style.setProperty('--pookie-bg', pookiePalette.background);
+        document.documentElement.style.setProperty('--pookie-display-bg', pookiePalette.displayBg);
+        document.documentElement.style.setProperty('--pookie-button-bg', pookiePalette.buttonBg);
+        document.documentElement.style.setProperty('--pookie-button-hover', pookiePalette.buttonHover);
+        document.documentElement.style.setProperty('--pookie-accent', pookiePalette.accent);
+        document.documentElement.style.setProperty('--pookie-text', pookiePalette.text);
+        
+        // Remove any existing theme classes that might interfere
+        document.body.classList.remove('dark-mode');
+        
+        // Apply pookie mode
+        calculator.classList.add('pookie-mode');
+      }
     }
     // Light theme is default, no action needed
   }
@@ -165,6 +254,18 @@ class Calculator {
         break;
       case 'pookie':
         if (calculator) {
+          // Apply the fixed dreamy palette first
+          document.documentElement.style.setProperty('--pookie-bg', pookiePalette.background);
+          document.documentElement.style.setProperty('--pookie-display-bg', pookiePalette.displayBg);
+          document.documentElement.style.setProperty('--pookie-button-bg', pookiePalette.buttonBg);
+          document.documentElement.style.setProperty('--pookie-button-hover', pookiePalette.buttonHover);
+          document.documentElement.style.setProperty('--pookie-accent', pookiePalette.accent);
+          document.documentElement.style.setProperty('--pookie-text', pookiePalette.text);
+          
+          // Remove any existing theme classes that might interfere
+          document.body.classList.remove('dark-mode');
+          
+          // Apply pookie mode
           calculator.classList.add('pookie-mode');
           this.pookieMode = true;
         }
@@ -2045,7 +2146,14 @@ function showIOSNotification(message, className = 'ios-notification', imageUrl =
     const remainingBlurry = otherNotifs.some(n => n.dataset.blur === 'true');
 
     if (!remainingBlurry) {
-      mainContent.style.filter = 'blur(0)';
+      // Completely remove blur and transition to prevent lingering effects
+      mainContent.style.filter = 'none';
+      mainContent.style.transition = 'none';
+      
+      // Reset transition after a brief delay to allow for future animations
+      setTimeout(() => {
+        mainContent.style.transition = '';
+      }, 50);
     }
 
     notification.style.filter = blurBackground ? 'blur(4px)' : 'none';
@@ -2154,6 +2262,20 @@ function openInAppBrowser(url) {
 
 // Add event listeners
 document.addEventListener('DOMContentLoaded', () => {
+  // Apply saved theme immediately on page load
+  const savedTheme = localStorage.getItem('aestheticTheme') || 'Default';
+  const savedDarkMode = localStorage.getItem('aestheticDarkMode') === 'true';
+  
+  // Apply theme immediately without waiting for theme section to open
+  if (savedTheme && typeof applyFigmaTheme === 'function') {
+    applyFigmaTheme(savedTheme, savedDarkMode);
+  }
+  
+  // Set dark mode class if needed
+  if (savedDarkMode) {
+    document.body.classList.add('dark-mode');
+  }
+
   // Show welcome notification with image
   setTimeout(() => {
     const desktopMode = window.innerWidth >= 760 && window.matchMedia('(orientation: landscape)').matches;
@@ -2173,7 +2295,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   findMaxNotificationFiles(1);
 
-  // Show a random notification every 20 seconds
+  // Show a random notification every 2 minutes
   setInterval(() => {
     if (totalRandomNotifications > 0) {
       const randomNum = Math.floor(Math.random() * totalRandomNotifications) + 1;
@@ -2183,7 +2305,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const randomNum = Math.floor(Math.random() * 3) + 1;
       showIOSNotification('', 'ios-notification-welcome', `notifications/random/${randomNum}.png`, false);
     }
-  }, 20000);
+  }, 120000);
 
   const buttons = document.querySelectorAll('.btn');
 
@@ -2192,6 +2314,86 @@ document.addEventListener('DOMContentLoaded', () => {
       // Handle button click
       calculator.handleButtonClick(button);
     });
+  });
+
+  // Add keyboard input functionality
+  document.addEventListener('keydown', (event) => {
+    const key = event.key;
+    
+    // Prevent default for calculator keys to avoid browser interference
+    if (['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '+', '-', '*', '/', '=', 'Enter', 'Escape', 'Backspace'].includes(key)) {
+      event.preventDefault();
+    }
+    
+    // Handle number keys and decimal point
+    if (key >= '0' && key <= '9') {
+      const numberButton = document.querySelector(`[data-number="${key}"]`);
+      if (numberButton) {
+        calculator.handleButtonClick(numberButton);
+        // Add visual feedback
+        numberButton.classList.add('active');
+        setTimeout(() => numberButton.classList.remove('active'), 100);
+      }
+    } else if (key === '.') {
+      const decimalButton = document.querySelector(`[data-number="."]`);
+      if (decimalButton) {
+        calculator.handleButtonClick(decimalButton);
+        // Add visual feedback
+        decimalButton.classList.add('active');
+        setTimeout(() => decimalButton.classList.remove('active'), 100);
+      }
+    }
+    
+    // Handle operator keys
+    else if (key === '+') {
+      const plusButton = document.querySelector(`[data-operator="+"]`);
+      if (plusButton) {
+        calculator.handleButtonClick(plusButton);
+        plusButton.classList.add('active');
+        setTimeout(() => plusButton.classList.remove('active'), 100);
+      }
+    } else if (key === '-') {
+      const minusButton = document.querySelector(`[data-operator="−"]`);
+      if (minusButton) {
+        calculator.handleButtonClick(minusButton);
+        minusButton.classList.add('active');
+        setTimeout(() => minusButton.classList.remove('active'), 100);
+      }
+    } else if (key === '*' || key === 'x') {
+      const multiplyButton = document.querySelector(`[data-operator="×"]`);
+      if (multiplyButton) {
+        calculator.handleButtonClick(multiplyButton);
+        multiplyButton.classList.add('active');
+        setTimeout(() => multiplyButton.classList.remove('active'), 100);
+      }
+    } else if (key === '/') {
+      const divideButton = document.querySelector(`[data-operator="÷"]`);
+      if (divideButton) {
+        calculator.handleButtonClick(divideButton);
+        divideButton.classList.add('active');
+        setTimeout(() => divideButton.classList.remove('active'), 100);
+      }
+    }
+    
+    // Handle equals key (both = and Enter)
+    else if (key === '=' || key === 'Enter') {
+      const equalsButton = document.querySelector(`[data-operator="="]`);
+      if (equalsButton) {
+        calculator.handleButtonClick(equalsButton);
+        equalsButton.classList.add('active');
+        setTimeout(() => equalsButton.classList.remove('active'), 100);
+      }
+    }
+    
+    // Handle escape and backspace for clear
+    else if (key === 'Escape' || key === 'Backspace') {
+      const clearButton = document.querySelector(`[data-action="clear"]`);
+      if (clearButton) {
+        calculator.handleButtonClick(clearButton);
+        clearButton.classList.add('active');
+        setTimeout(() => clearButton.classList.remove('active'), 100);
+      }
+    }
   });
 
   // Add corner button functionality
@@ -2224,9 +2426,192 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // ── KEYBOARD SHORTCUTS ──
+  document.addEventListener('keydown', (e) => {
+    // ESC key - window management
+    if (e.key === 'Escape') {
+      if (e.repeat) {
+        // Holding ESC - close all windows one by one
+        const windows = Array.from(openWindows).reverse(); // Close from top to bottom
+        if (windows.length > 0) {
+          const topWindow = windows[0];
+          const overlay = topWindow.closest('.settings-overlay, .about-overlay, .history-overlay, .ios-menu-overlay, .ios-error-overlay');
+          if (overlay) {
+            overlay.classList.remove('active');
+            setTimeout(() => overlay.remove(), 300);
+            openWindows.delete(topWindow);
+          }
+        }
+      } else {
+        // Single ESC press - close current top window
+        const windows = Array.from(openWindows).reverse();
+        if (windows.length > 0) {
+          const topWindow = windows[0];
+          const overlay = topWindow.closest('.settings-overlay, .about-overlay, .history-overlay, .ios-menu-overlay, .ios-error-overlay');
+          if (overlay) {
+            overlay.classList.remove('active');
+            setTimeout(() => overlay.remove(), 300);
+            openWindows.delete(topWindow);
+          }
+        }
+      }
+    }
+    
+    // Tab key - toggle main sidebar
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      const menuOverlay = document.querySelector('.ios-menu-overlay');
+      if (menuOverlay && menuOverlay.classList.contains('active')) {
+        // Close sidebar if open
+        menuOverlay.classList.remove('active');
+        setTimeout(() => {
+          if (menuOverlay.parentNode) {
+            menuOverlay.remove();
+          }
+        }, 350);
+      } else {
+        // Open sidebar if closed
+        if (menuOverlay) {
+          menuOverlay.classList.add('active');
+        } else {
+          showIOSMenu();
+        }
+      }
+    }
+    
+    // Window shortcuts
+    if (e.key.toLowerCase() === 'h') {
+      e.preventDefault();
+      showHistory(); // Open History window
+    }
+    if (e.key.toLowerCase() === 'c') {
+      e.preventDefault();
+      showSettingsMenu(); // Open Settings window
+    }
+    if (e.key.toLowerCase() === 'a') {
+      e.preventDefault();
+      showAestheticMenu(); // Open Aesthetics window
+    }
+    if (e.key.toLowerCase() === 's') {
+      e.preventDefault();
+      showSoundsMenu(); // Open Sounds window
+    }
+    if (e.key.toLowerCase() === 'f' || e.key.toLowerCase() === 'x') {
+      e.preventDefault();
+      showAboutWindow(); // Open About window
+    }
+    
+    // P key - toggle pookie mode
+    if (e.key.toLowerCase() === 'p') {
+      calculator.togglePookieMode();
+    }
+    
+    // Space long press - toggle pookie mode (handled separately)
+    
+    // Calculator number keys
+    if (e.key >= '0' && e.key <= '9') {
+      calculator.handleNumberInput(e.key);
+    }
+    
+    // Calculator operations
+    if (e.key === '+') calculator.handleOperator('+');
+    if (e.key === '-') calculator.handleOperator('-');
+    if (e.key === '*') calculator.handleOperator('*');
+    if (e.key === '/') calculator.handleOperator('/');
+    if (e.key === '%') calculator.handleOperator('%');
+    if (e.key === '.') calculator.handleNumberInput('.');
+    
+    // Enter key for equals
+    if (e.key === 'Enter') {
+      calculator.handleEquals();
+    }
+    
+    // Backspace for delete
+    if (e.key === 'Backspace') {
+      calculator.handleDelete();
+    }
+    
+    // Arrow keys for navigation
+    if (e.key === 'ArrowUp') {
+      // Navigate up in history or menu
+      e.preventDefault();
+    }
+    if (e.key === 'ArrowDown') {
+      // Navigate down in history or menu
+      e.preventDefault();
+    }
+    if (e.key === 'ArrowLeft') {
+      // Navigate left or back
+      e.preventDefault();
+    }
+    if (e.key === 'ArrowRight') {
+      // Navigate right or forward (also works as equals)
+      e.preventDefault();
+      calculator.handleEquals();
+    }
+  });
+  
+  // Close sidebar when clicking calculator
+  document.addEventListener('click', (e) => {
+    const menuOverlay = document.querySelector('.ios-menu-overlay');
+    const calculator = document.querySelector('.calculator');
+    
+    if (menuOverlay && menuOverlay.classList.contains('active') && 
+        calculator && calculator.contains(e.target) && 
+        !e.target.closest('.ios-menu-container')) {
+      // Click on calculator while sidebar is open - close sidebar
+      menuOverlay.classList.remove('active');
+      setTimeout(() => {
+        if (menuOverlay.parentNode) {
+          menuOverlay.remove();
+        }
+      }, 350);
+    }
+  });
+  
+  // Space long press for pookie mode
+  let spacePressTimer;
+  document.addEventListener('keydown', (e) => {
+    if (e.key === ' ' && !e.repeat) {
+      spacePressTimer = setTimeout(() => {
+        calculator.togglePookieMode();
+      }, 500); // 500ms long press
+    }
+  });
+  
+  document.addEventListener('keyup', (e) => {
+    if (e.key === ' ') {
+      clearTimeout(spacePressTimer);
+    }
+  });
+
   // ── REUSABLE MACOS WINDOW LOGIC ──
+  // Global window management
+  let highestZIndex = 10000;
+  const openWindows = new Set();
+  let windowCascadeOffset = { x: 0, y: 0 }; // Track cascading position
+
   function initMacOSWindow(windowContainer, windowOverlay, titleBar, onClose, bubbleIconSVG, customConfig = {}) {
     windowContainer.classList.add('macos-window');
+    
+    // Window management - assign highest z-index and track window
+    highestZIndex++;
+    windowContainer.style.zIndex = highestZIndex;
+    windowOverlay.style.zIndex = highestZIndex - 1; // Overlay slightly below container
+    openWindows.add(windowContainer);
+    
+    // Bring to front on click
+    const bringToFront = () => {
+      if (!windowContainer.classList.contains('minimized')) {
+        highestZIndex++;
+        windowContainer.style.zIndex = highestZIndex;
+        windowOverlay.style.zIndex = highestZIndex - 1; // Keep overlay below container
+      }
+    };
+    
+    // Add click listeners to entire window container and titlebar
+    windowContainer.addEventListener('mousedown', bringToFront);
+    titleBar.addEventListener('mousedown', bringToFront);
 
     // Add Revert Button for Maximized Mode
     const revertBtn = document.createElement('button');
@@ -2234,13 +2619,38 @@ document.addEventListener('DOMContentLoaded', () => {
     revertBtn.innerHTML = '<i class="fas fa-compress-arrows-alt"></i>';
     windowOverlay.appendChild(revertBtn);
 
-    // Initial positioning (Centered)
-    const initialWidth = customConfig.width || Math.min(1000, window.innerWidth * 0.9);
-    const initialHeight = customConfig.height || Math.min(750, window.innerHeight * 0.85);
+    // Initial positioning (Centered) - Default size with responsive scaling for small screens
+    const defaultWidth = 1056; // Default width (1.5 inches less than 1200px)
+    const defaultHeight = 594; // Default height (16:9 ratio of 960px)
+    
+    const maxWidth = Math.min(defaultWidth, window.innerWidth * 0.85); // Use default or 85% of screen
+    const maxHeight = Math.min(defaultHeight, window.innerHeight * 0.80); // Use default or 80% of screen
+    
+    const initialWidth = customConfig.width || maxWidth;
+    const initialHeight = customConfig.height || (initialWidth * 9 / 16); // 16:9 ratio
+    
+    // Calculate cascading position
+    const centerX = (window.innerWidth - initialWidth) / 2;
+    const centerY = (window.innerHeight - initialHeight) / 2;
+    
+    // Apply cascading offset (30px down, 30px left for each new window)
+    const finalX = centerX - windowCascadeOffset.x;
+    const finalY = centerY + windowCascadeOffset.y;
+    
+    // Update cascade offset for next window
+    windowCascadeOffset.x += 30;
+    windowCascadeOffset.y += 30;
+    
+    // Reset offset if it goes too far
+    if (windowCascadeOffset.x > 150 || windowCascadeOffset.y > 150) {
+      windowCascadeOffset.x = 0;
+      windowCascadeOffset.y = 0;
+    }
+    
     windowContainer.style.width = `${initialWidth}px`;
     windowContainer.style.height = `${initialHeight}px`;
-    windowContainer.style.top = `${(window.innerHeight - initialHeight) / 2}px`;
-    windowContainer.style.left = `${(window.innerWidth - initialWidth) / 2}px`;
+    windowContainer.style.top = `${finalY}px`;
+    windowContainer.style.left = `${finalX}px`;
 
     // Resize Handles
     const handles = ['top', 'bottom', 'left', 'right', 'top-left', 'top-right', 'bottom-left', 'bottom-right'];
@@ -2332,6 +2742,13 @@ document.addEventListener('DOMContentLoaded', () => {
       document.body.style.userSelect = ''; document.body.style.cursor = '';
     };
 
+    // Double-click titlebar to maximize
+    titleBar.addEventListener('dblclick', (e) => {
+      if (!e.target.closest('.traffic-light')) {
+        toggleMaximize();
+      }
+    });
+    
     titleBar.addEventListener('mousedown', startMoving);
     titleBar.addEventListener('touchstart', startMoving, { passive: true });
     windowContainer.addEventListener('mousedown', (e) => { if (windowContainer.classList.contains('minimized')) startMoving(e); });
@@ -2415,11 +2832,68 @@ document.addEventListener('DOMContentLoaded', () => {
       if (windowContainer.classList.contains('minimized') && Date.now() - dragStartTime < 200) toggleMinimize();
     });
 
-    return { toggleMinimize, toggleMaximize, stopPhysics: () => { if (bubblePhysicsId) cancelAnimationFrame(bubblePhysicsId); } };
+    return { 
+      toggleMinimize, 
+      toggleMaximize, 
+      stopPhysics: () => { 
+        if (bubblePhysicsId) cancelAnimationFrame(bubblePhysicsId); 
+      },
+      cleanup: () => {
+        openWindows.delete(windowContainer);
+      }
+    };
   }
 
   // Define functions first
   // Define functions first
+  
+  // Function to add resizer functionality to any sidebar
+  function addSidebarResizer(sidebar, storageKey = 'sidebarWidth') {
+    // Add resizer element
+    const resizer = document.createElement('div');
+    resizer.classList.add('settings-sidebar-resizer');
+    sidebar.appendChild(resizer);
+
+    // Resizer functionality
+    let isResizing = false;
+    let resizeStartX = 0;
+    let startWidth = 0;
+
+    resizer.addEventListener('mousedown', (e) => {
+      isResizing = true;
+      resizeStartX = e.clientX;
+      startWidth = sidebar.offsetWidth;
+      resizer.classList.add('dragging');
+      e.preventDefault();
+    });
+
+    document.addEventListener('mousemove', (e) => {
+      if (!isResizing) return;
+      
+      const deltaX = e.clientX - resizeStartX;
+      const newWidth = startWidth + deltaX;
+      
+      // Constrain to min/max width
+      if (newWidth >= 150 && newWidth <= 250) {
+        sidebar.style.width = newWidth + 'px';
+        localStorage.setItem(storageKey, newWidth + 'px');
+      }
+    });
+
+    document.addEventListener('mouseup', () => {
+      if (isResizing) {
+        isResizing = false;
+        resizer.classList.remove('dragging');
+      }
+    });
+
+    // Load saved width
+    const savedWidth = localStorage.getItem(storageKey);
+    if (savedWidth) {
+      sidebar.style.width = savedWidth;
+    }
+  }
+
   function showIOSMenu() {
     // Create iOS-style menu overlay
     const menuOverlay = document.createElement('div');
@@ -2427,6 +2901,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const menuContainer = document.createElement('div');
     menuContainer.classList.add('ios-menu-container');
+
+    // Add resizer element
+    const menuResizer = document.createElement('div');
+    menuResizer.classList.add('ios-menu-resizer');
 
     // Build header
     const header = document.createElement('div');
@@ -2447,9 +2925,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const mainItems = [
       { text: 'History', action: 'history', icon: 'fa-clock-rotate-left', color: 'var(--accent)' },
-      { text: 'Settings', action: 'settings', icon: 'fa-sliders', color: '#636366' },
+      { text: 'Config', action: 'settings', icon: 'fa-sliders', color: '#636366' },
       { text: 'Aesthetic', action: 'aesthetic', icon: 'fa-palette', color: '#ff69b4' },
       { text: 'Sounds', action: 'sounds', icon: 'fa-volume-up', color: '#007AFF' },
+      { text: 'Keys', action: 'keys', icon: 'fa-keyboard', color: '#ff9500' },
     ];
 
     mainItems.forEach(option => {
@@ -2479,7 +2958,7 @@ document.addEventListener('DOMContentLoaded', () => {
     moreSection.innerHTML = `<div class="ios-menu-section-label">More</div>`;
 
     const moreItems = [
-      { text: 'About', action: 'about', icon: 'fa-circle-info', color: '#34c759' },
+      { text: 'Developer', action: 'about', icon: 'fa-circle-info', color: '#34c759' },
     ];
 
     moreItems.forEach(option => {
@@ -2504,17 +2983,59 @@ document.addEventListener('DOMContentLoaded', () => {
     footer.innerHTML = `<div class="ios-menu-footer-text">Calovetor • By Samad Khan</div>`;
     menuContainer.appendChild(footer);
 
+    // Append resizer to menu container
+    menuContainer.appendChild(menuResizer);
+
+    // Resizer functionality
+    let isResizing = false;
+    let resizeStartX = 0;
+    let startWidth = 0;
+
+    menuResizer.addEventListener('mousedown', (e) => {
+      isResizing = true;
+      resizeStartX = e.clientX;
+      startWidth = menuContainer.offsetWidth;
+      menuResizer.classList.add('dragging');
+      e.preventDefault();
+    });
+
+    document.addEventListener('mousemove', (e) => {
+      if (!isResizing) return;
+      
+      const deltaX = e.clientX - resizeStartX;
+      const newWidth = startWidth + deltaX;
+      
+      // Constrain to min/max width
+      if (newWidth >= 200 && newWidth <= 400) {
+        menuContainer.style.width = newWidth + 'px';
+        localStorage.setItem('menuWidth', newWidth + 'px');
+      }
+    });
+
+    document.addEventListener('mouseup', () => {
+      if (isResizing) {
+        isResizing = false;
+        menuResizer.classList.remove('dragging');
+      }
+    });
+
+    // Load saved width
+    const savedWidth = localStorage.getItem('menuWidth');
+    if (savedWidth) {
+      menuContainer.style.width = savedWidth;
+    }
+
     // Swipe-to-close (touch)
-    let isDragging = false, startX = 0, currentX = 0;
+    let isDragging = false, swipeStartX = 0, currentX = 0;
     menuContainer.addEventListener('touchstart', (e) => {
       isDragging = true;
-      startX = e.touches[0].clientX;
+      swipeStartX = e.touches[0].clientX;
       currentX = 0;
       menuContainer.style.transition = 'none';
     });
     menuContainer.addEventListener('touchmove', (e) => {
       if (!isDragging) return;
-      const delta = e.touches[0].clientX - startX;
+      const delta = e.touches[0].clientX - swipeStartX;
       currentX = Math.min(0, delta);
       menuContainer.style.transform = `translateX(${currentX}px)`;
     });
@@ -2525,10 +3046,7 @@ document.addEventListener('DOMContentLoaded', () => {
       else menuContainer.style.transform = 'translateX(0)';
     });
 
-    // Click outside to close
-    menuOverlay.addEventListener('click', (e) => {
-      if (e.target === menuOverlay) closeIOSMenu();
-    });
+    // Removed click outside to close - only close button works
 
     menuOverlay.appendChild(menuContainer);
     document.body.appendChild(menuOverlay);
@@ -2563,6 +3081,9 @@ document.addEventListener('DOMContentLoaded', () => {
         break;
       case 'sounds':
         showSoundsMenu();
+        break;
+      case 'keys':
+        showKeysMenu();
         break;
     }
   }
@@ -2679,16 +3200,18 @@ document.addEventListener('DOMContentLoaded', () => {
     `;
 
     const closeHistory = () => {
-      stopBubblePhysics(); // Stop item bubbles
-      winLogic.stopPhysics(); // Stop window minimize physics
-      historyOverlay.classList.remove('active');
-      setTimeout(() => historyOverlay.remove(), 300);
-    };
+    stopBubblePhysics(); // Stop item bubbles
+    winLogic.stopPhysics(); // Stop window minimize physics
+    winLogic.cleanup(); // Clean up window tracking
+    historyOverlay.classList.remove('active');
+    setTimeout(() => historyOverlay.remove(), 350);
+  };
 
-    const title = document.createElement('div');
+  const title = document.createElement('div');
     title.classList.add('macos-title');
     title.textContent = 'Calculation History';
 
+    // Done button for iOS mobile
     const doneBtn = document.createElement('div');
     doneBtn.classList.add('ios-done-btn');
     doneBtn.addEventListener('click', closeHistory);
@@ -2706,6 +3229,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const winLogic = initMacOSWindow(historyContainer, historyOverlay, titleBar, closeHistory, historyIconSVG);
 
+    historyContainer.appendChild(titleBar);
+
     // Window Body
     const windowBody = document.createElement('div');
     windowBody.classList.add('settings-window-body');
@@ -2721,7 +3246,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
       
       <!-- Layout Switcher (Visible in All) -->
-      <div class="macos-settings-row view-switcher-toolbar">
+      <div class="macos-settings-row view-switcher-tabs-navigation">
+        <div class="tabs-nav">
+          <div class="tab active" data-tab="themes">Themes</div>
+          <div class="tab" data-tab="documentation">Documentation</div>
+        </div>
         <div class="row-info">
           <div class="row-title">History Feed</div>
           <div class="row-subtitle">Choose how you see your history.</div>
@@ -2935,26 +3464,33 @@ document.addEventListener('DOMContentLoaded', () => {
       sidebar.appendChild(sbItem);
     });
 
+    // Add resizer to History sidebar
+    addSidebarResizer(sidebar, 'historySidebarWidth');
+
     windowBody.appendChild(sidebar);
     windowBody.appendChild(content);
 
-    historyContainer.appendChild(titleBar);
     historyContainer.appendChild(windowBody);
     historyOverlay.appendChild(historyContainer);
     document.body.appendChild(historyOverlay);
 
     setTimeout(() => historyOverlay.classList.add('active'), 10);
-    historyOverlay.addEventListener('click', (e) => {
-      if (e.target === historyOverlay) closeHistory();
-    });
+    // Removed click outside to close - only close button works
   }
 
   function showIOSError(message) {
+    // Play error sound
+    calculator.playErrorSound();
+    
     const errorOverlay = document.createElement('div');
     errorOverlay.classList.add('error-alert-overlay');
 
     const errorContainer = document.createElement('div');
     errorContainer.classList.add('error-alert-container');
+    
+    // Make error container draggable
+    errorContainer.style.cursor = 'move';
+    errorContainer.draggable = true;
 
     // MacOS Traffic Lights (Header)
     const macosHeader = document.createElement('div');
@@ -2974,7 +3510,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const titleEl = document.createElement('div');
     titleEl.classList.add('error-alert-title');
     titleEl.innerHTML = `
-      <img src="icons/pookie_mode_button.png" class="error-alert-title-icon" alt="">
+      <img src="icons/pookie_mode_button.png" class="error-alert-title-icon" alt="" draggable="false">
       <span>Calovetor</span>
     `;
 
@@ -2996,9 +3532,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     errorButton.addEventListener('click', closeAlert);
-    errorOverlay.addEventListener('click', (e) => {
-      if (e.target === errorOverlay) closeAlert();
-    });
+    // Removed click outside to close - only close button works
 
     actionContainer.appendChild(errorButton);
     bodyContainer.appendChild(titleEl);
@@ -3008,8 +3542,125 @@ document.addEventListener('DOMContentLoaded', () => {
     errorOverlay.appendChild(errorContainer);
     document.body.appendChild(errorOverlay);
 
+    // Add drag functionality
+    let isDragging = false;
+    let currentX;
+    let currentY;
+    let initialX;
+    let initialY;
+    let xOffset = 0;
+    let yOffset = 0;
+
+    function dragStart(e) {
+      if (e.type === "touchstart") {
+        initialX = e.touches[0].clientX - xOffset;
+        initialY = e.touches[0].clientY - yOffset;
+      } else {
+        initialX = e.clientX - xOffset;
+        initialY = e.clientY - yOffset;
+      }
+
+      if (e.target === errorContainer || e.target.closest('.error-alert-body')) {
+        isDragging = true;
+        errorContainer.style.transition = 'none';
+      }
+    }
+
+    function dragEnd(e) {
+      initialX = currentX;
+      initialY = currentY;
+      isDragging = false;
+      errorContainer.style.transition = '';
+    }
+
+    function drag(e) {
+      if (isDragging) {
+        e.preventDefault();
+        
+        if (e.type === "touchmove") {
+          currentX = e.touches[0].clientX - initialX;
+          currentY = e.touches[0].clientY - initialY;
+        } else {
+          currentX = e.clientX - initialX;
+          currentY = e.clientY - initialY;
+        }
+
+        xOffset = currentX;
+        yOffset = currentY;
+
+        errorContainer.style.transform = `translate(${currentX}px, ${currentY}px) scale(1)`;
+      }
+    }
+
+    // Add event listeners for dragging
+    errorContainer.addEventListener('mousedown', dragStart);
+    document.addEventListener('mouseup', dragEnd);
+    document.addEventListener('mousemove', drag);
+    
+    // Touch events for mobile
+    errorContainer.addEventListener('touchstart', dragStart);
+    document.addEventListener('touchend', dragEnd);
+    document.addEventListener('touchmove', drag);
+
+    // Prevent button from triggering drag
+    errorButton.addEventListener('mousedown', (e) => {
+      e.stopPropagation();
+    });
+    errorButton.addEventListener('touchstart', (e) => {
+      e.stopPropagation();
+    });
+
+    // Prevent image from being draggable
+    const errorImage = errorContainer.querySelector('img');
+    if (errorImage) {
+      errorImage.addEventListener('dragstart', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      });
+      errorImage.addEventListener('mousedown', (e) => {
+        e.stopPropagation();
+      });
+      errorImage.addEventListener('touchstart', (e) => {
+        e.stopPropagation();
+      });
+    }
+
     // Animate in
     setTimeout(() => errorOverlay.classList.add('active'), 10);
+
+    // Add click event to overlay for bounce animation and sound
+    errorOverlay.addEventListener('click', (e) => {
+      // Only trigger if clicking on the overlay background, not the error container
+      if (e.target === errorOverlay) {
+        // Play error sound again
+        calculator.playErrorSound();
+        
+        // Add bounce animation
+        errorContainer.style.transition = 'transform 0.1s cubic-bezier(0.68, -0.55, 0.265, 1.55)';
+        errorContainer.style.transform = `translate(${currentX || 0}px, ${currentY || 0}px) scale(1.1)`;
+        
+        setTimeout(() => {
+          errorContainer.style.transform = `translate(${currentX || 0}px, ${currentY || 0}px) scale(1)`;
+        }, 100);
+      }
+    });
+
+    // Add keyboard support for Enter key and Space bar
+    const handleKeyPress = (e) => {
+      if (e.key === 'Enter' || e.key === 'Return' || e.key === ' ' || e.key === 'Space') {
+        e.preventDefault();
+        closeAlert();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyPress);
+
+    // Clean up event listener when error is closed
+    const originalCloseAlert = closeAlert;
+    closeAlert = () => {
+      document.removeEventListener('keydown', handleKeyPress);
+      originalCloseAlert();
+    };
   }
 
   function showPookieBox() {
@@ -3029,7 +3680,7 @@ document.addEventListener('DOMContentLoaded', () => {
         <div class="traffic-light yellow" title="Minimize"></div>
         <div class="traffic-light green" title="Maximize"></div>
       </div>
-      <div class="macos-title">About Sam Devlopments</div>
+      <div class="macos-title">Sam Devlopments by Samad Khan</div>
     `;
 
     // iOS Header (Visible in portrait via CSS)
@@ -3261,6 +3912,9 @@ document.addEventListener('DOMContentLoaded', () => {
     mainLayout.appendChild(sidebar);
     mainLayout.appendChild(contentArea);
 
+    // Add resizer to About sidebar
+    addSidebarResizer(sidebar, 'aboutSidebarWidth');
+
     aboutContainer.appendChild(macosHeader);
     aboutContainer.appendChild(iosHeader);
     aboutContainer.appendChild(mainLayout);
@@ -3270,6 +3924,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const closeAbout = () => {
       winLogic.stopPhysics();
+      winLogic.cleanup(); // Clean up window tracking
       aboutOverlay.classList.remove('active');
       setTimeout(() => aboutOverlay.remove(), 350);
     };
@@ -3288,7 +3943,7 @@ document.addEventListener('DOMContentLoaded', () => {
       item.addEventListener('click', () => {
         const tab = item.dataset.tab;
         if (tab === 'resume') {
-          openInAppBrowser('https://dub.sh/samfolio');
+          showResumeWindow();
           return;
         }
         sidebar.querySelectorAll('.about-sidebar-item').forEach(i => i.classList.remove('active'));
@@ -3299,11 +3954,120 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     });
 
-    aboutOverlay.addEventListener('click', (e) => {
-      if (e.target === aboutOverlay) closeAbout();
-    });
+    // Removed click outside to close - only close button works
 
     setTimeout(() => aboutOverlay.classList.add('active'), 10);
+  }
+
+  function showResumeWindow() {
+    // Create resume overlay with higher z-index
+    const resumeOverlay = document.createElement('div');
+    resumeOverlay.classList.add('settings-overlay');
+    if (calculator.pookieMode) resumeOverlay.classList.add('pookie-active');
+    
+    // Ensure resume window is always on top
+    highestZIndex++;
+    resumeOverlay.style.zIndex = highestZIndex;
+
+    const resumeContainer = document.createElement('div');
+    resumeContainer.classList.add('settings-container');
+
+    // MacOS Title Bar
+    const titleBar = document.createElement('div');
+    titleBar.classList.add('macos-title-bar');
+
+    const trafficLights = document.createElement('div');
+    trafficLights.classList.add('macos-traffic-lights');
+    trafficLights.innerHTML = `
+      <div class="traffic-light red"></div>
+      <div class="traffic-light yellow"></div>
+      <div class="traffic-light green"></div>
+    `;
+
+    const title = document.createElement('div');
+    title.classList.add('macos-title');
+    title.style.cssText = 'display: none;'; // Hide title since we have address bar
+
+    // Browser address bar in titlebar
+    const addressBar = document.createElement('div');
+    addressBar.style.cssText = `
+      flex: 1;
+      margin: 0 80px;
+      display: flex;
+      align-items: center;
+      padding: 6px 12px;
+      background: rgba(0, 0, 0, 0.05);
+      border-radius: 6px;
+      font-size: 12px;
+      color: #666;
+      height: 24px;
+    `;
+    addressBar.innerHTML = `
+      <i class="fas fa-lock" style="margin-right: 8px; color: #4caf50; font-size: 10px;"></i>
+      <span>https://dub.sh/samfolio</span>
+    `;
+
+    titleBar.appendChild(trafficLights);
+    titleBar.appendChild(addressBar);
+
+    const closeResumeWindow = () => {
+      winLogic.stopPhysics();
+      resumeOverlay.classList.remove('active');
+      setTimeout(() => resumeOverlay.remove(), 300);
+    };
+
+    const resumeIconSVG = `
+      <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+        <polyline points="14,2 14,8 20,8"></polyline>
+        <line x1="16" y1="13" x2="8" y2="13"></line>
+        <line x1="16" y1="17" x2="8" y2="17"></line>
+        <polyline points="10,9 9,9 8,9"></polyline>
+      </svg>
+    `;
+
+    const winLogic = initMacOSWindow(resumeContainer, resumeOverlay, titleBar, closeResumeWindow, resumeIconSVG);
+
+    // Resume Window Body
+    const windowBody = document.createElement('div');
+    windowBody.classList.add('settings-window-body');
+
+    // Browser-like content area
+    const contentArea = document.createElement('div');
+    contentArea.style.cssText = `
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background: white;
+      border-radius: 8px;
+      overflow: hidden;
+    `;
+
+    // Resume content iframe
+    const resumeFrame = document.createElement('iframe');
+    resumeFrame.src = 'https://dub.sh/samfolio';
+    resumeFrame.style.cssText = `
+      flex: 1;
+      width: 100%;
+      border: none;
+      background: white;
+    `;
+
+    contentArea.appendChild(resumeFrame);
+
+    windowBody.appendChild(contentArea);
+
+    resumeContainer.appendChild(titleBar);
+    resumeContainer.appendChild(windowBody);
+    resumeOverlay.appendChild(resumeContainer);
+    document.body.appendChild(resumeOverlay);
+
+    // Animate in
+    setTimeout(() => {
+      resumeOverlay.classList.add('active');
+    }, 10);
+
+    // Removed click outside to close - only close button works
   }
 
   function showSettingsMenu() {
@@ -3329,13 +4093,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const closeSettingsMenu = () => {
       winLogic.stopPhysics();
+      winLogic.cleanup(); // Clean up window tracking
       settingsOverlay.classList.remove('active');
       setTimeout(() => settingsOverlay.remove(), 300);
     };
 
     const title = document.createElement('div');
     title.classList.add('macos-title');
-    title.textContent = 'System Settings';
+    title.textContent = 'System Configuration';
 
     // Done button for iOS mobile
     const doneBtn = document.createElement('div');
@@ -3365,7 +4130,8 @@ document.addEventListener('DOMContentLoaded', () => {
     sidebar.classList.add('settings-sidebar');
 
     const sidebarItems = [
-      { id: 'appearance', icon: 'fa-palette', label: 'Appearance' }
+      { id: 'input', icon: 'fa-keyboard', label: 'Input' },
+      { id: 'menubar', icon: 'fa-bars', label: 'Menubar' }
     ];
 
     // Content Area
@@ -3388,22 +4154,108 @@ document.addEventListener('DOMContentLoaded', () => {
       sidebar.appendChild(sbItem);
     });
 
+    // Add resizer to Settings sidebar
+    addSidebarResizer(sidebar, 'settingsSidebarWidth');
+
     // Content sections
     const currentTheme = localStorage.getItem('calculatorTheme') || 'light';
+    const currentInputMode = localStorage.getItem('calculatorInputMode') || 'mixed';
 
     content.innerHTML = `
-      <!-- Appearance Section -->
-      <div class="settings-section active" id="section-appearance">
-        <div class="settings-section-title">Appearance</div>
+      <!-- Input Section -->
+      <div class="settings-section active" id="section-input">
+        <div class="settings-section-title">Input</div>
         <div class="macos-settings-row">
           <div class="row-info">
-            <div class="row-title">Theme</div>
-            <div class="row-subtitle">Select your favorite calculator look.</div>
+            <div class="row-title">Mixed</div>
+            <div class="row-subtitle">All inputs will be acceptable</div>
           </div>
-          <select class="ios-select theme-select">
-            <option value="light" ${currentTheme === 'light' ? 'selected' : ''}>Light</option>
-            <option value="dark" ${currentTheme === 'dark' ? 'selected' : ''}>Dark</option>
-          </select>
+          <div class="ios-toggle ${currentInputMode === 'mixed' ? 'active' : ''}" data-input-mode="mixed">
+            <div class="ios-toggle-slider"></div>
+          </div>
+        </div>
+        <div class="macos-settings-row">
+          <div class="row-info">
+            <div class="row-title">Keyboard</div>
+            <div class="row-subtitle">Use calculator buttons from keyboard only</div>
+          </div>
+          <div class="ios-toggle ${currentInputMode === 'keyboard' ? 'active' : ''}" data-input-mode="keyboard">
+            <div class="ios-toggle-slider"></div>
+          </div>
+        </div>
+        <div class="macos-settings-row">
+          <div class="row-info">
+            <div class="row-title">Mouse</div>
+            <div class="row-subtitle">Use calculator buttons from mouse only</div>
+          </div>
+          <div class="ios-toggle ${currentInputMode === 'mouse' ? 'active' : ''}" data-input-mode="mouse">
+            <div class="ios-toggle-slider"></div>
+          </div>
+        </div>
+        <div class="macos-settings-row">
+          <div class="row-info">
+            <div class="row-title">Touch</div>
+            <div class="row-subtitle">Use calculator buttons from touch only [Android]</div>
+          </div>
+          <div class="ios-toggle ${currentInputMode === 'touch' ? 'active' : ''}" data-input-mode="touch">
+            <div class="ios-toggle-slider"></div>
+          </div>
+        </div>
+        <div class="macos-settings-row">
+          <div class="row-info">
+            <div class="row-title">Voice Command</div>
+            <div class="row-subtitle">Voice command [coming soon]</div>
+          </div>
+          <div class="ios-toggle disabled" disabled>
+            <div class="ios-toggle-slider"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Menubar Section -->
+      <div class="settings-section" id="section-menubar">
+        <div class="settings-section-title">Menubar</div>
+        <div class="macos-settings-row">
+          <div class="row-info">
+            <div class="row-title">Enable Menubar</div>
+            <div class="row-subtitle">Toggle main menu sidebar visibility</div>
+          </div>
+          <div class="ios-toggle ${localStorage.getItem('menubarEnabled') !== 'false' ? 'active' : ''}" data-menubar-setting="enabled">
+            <div class="ios-toggle-slider"></div>
+          </div>
+        </div>
+        <div class="macos-settings-row">
+          <div class="row-info">
+            <div class="row-title">Compact Mode</div>
+            <div class="row-subtitle">Reduce menubar height for more screen space</div>
+          </div>
+          <div class="ios-toggle ${localStorage.getItem('menubarCompact') === 'true' ? 'active' : ''}" data-menubar-setting="compact">
+            <div class="ios-toggle-slider"></div>
+          </div>
+        </div>
+        <div class="macos-settings-row">
+          <div class="row-info">
+            <div class="row-title">Position</div>
+            <div class="row-subtitle">Choose menubar placement</div>
+          </div>
+          <div class="position-selector">
+            <div class="position-option ${(!localStorage.getItem('menubarPosition') || localStorage.getItem('menubarPosition') === 'top') ? 'active' : ''}" data-position="top">
+              <div class="position-icon">⬆</div>
+              <span>Top</span>
+            </div>
+            <div class="position-option ${localStorage.getItem('menubarPosition') === 'bottom' ? 'active' : ''}" data-position="bottom">
+              <div class="position-icon">⬇</div>
+              <span>Bottom</span>
+            </div>
+            <div class="position-option ${localStorage.getItem('menubarPosition') === 'left' ? 'active' : ''}" data-position="left">
+              <div class="position-icon">⬅</div>
+              <span>Left</span>
+            </div>
+            <div class="position-option ${localStorage.getItem('menubarPosition') === 'right' ? 'active' : ''}" data-position="right">
+              <div class="position-icon">➡</div>
+              <span>Right</span>
+            </div>
+          </div>
         </div>
       </div>
     `;
@@ -3422,14 +4274,553 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 10);
 
     // Event Listeners for controls
-    const themeSelect = content.querySelector('.theme-select');
-    themeSelect.addEventListener('change', (e) => changeTheme(e.target.value));
-
-    // Close on overlay click
-    settingsOverlay.addEventListener('click', (e) => {
-      if (e.target === settingsOverlay) closeSettingsMenu();
+    // Input mode toggle event listeners
+    const inputToggles = content.querySelectorAll('[data-input-mode]');
+    inputToggles.forEach(toggle => {
+      toggle.addEventListener('click', function() {
+        const mode = this.getAttribute('data-input-mode');
+        
+        // If clicking mixed, enable it and disable all others
+        if (mode === 'mixed') {
+          inputToggles.forEach(t => {
+            if (t.getAttribute('data-input-mode') !== 'mixed') {
+              t.classList.remove('active');
+            }
+          });
+          this.classList.add('active');
+          localStorage.setItem('calculatorInputMode', 'mixed');
+          applyInputMode('mixed');
+        } else {
+          // If clicking any other mode, disable mixed and enable this one
+          inputToggles.forEach(t => {
+            if (t.getAttribute('data-input-mode') === 'mixed') {
+              t.classList.remove('active');
+            }
+          });
+          
+          // Toggle this mode on/off
+          if (this.classList.contains('active')) {
+            this.classList.remove('active');
+            // If no active mode, revert to mixed
+            const hasActiveMode = Array.from(inputToggles).some(t => 
+              t.classList.contains('active') && t.getAttribute('data-input-mode') !== 'mixed'
+            );
+            if (!hasActiveMode) {
+              inputToggles.find(t => t.getAttribute('data-input-mode') === 'mixed').classList.add('active');
+              localStorage.setItem('calculatorInputMode', 'mixed');
+              applyInputMode('mixed');
+            }
+          } else {
+            this.classList.add('active');
+            localStorage.setItem('calculatorInputMode', mode);
+            applyInputMode(mode);
+          }
+        }
+      });
     });
+
+    // Menubar settings event listeners
+    const menubarToggles = content.querySelectorAll('[data-menubar-setting]');
+    menubarToggles.forEach(toggle => {
+      toggle.addEventListener('click', function() {
+        const setting = this.getAttribute('data-menubar-setting');
+        const isActive = this.classList.contains('active');
+        
+        // Toggle the setting
+        if (isActive) {
+          this.classList.remove('active');
+          localStorage.setItem('menubar' + setting.charAt(0).toUpperCase() + setting.slice(1), 'false');
+        } else {
+          this.classList.add('active');
+          localStorage.setItem('menubar' + setting.charAt(0).toUpperCase() + setting.slice(1), 'true');
+        }
+        
+        // Apply menubar settings
+        applyMenubarSettings();
+      });
+    });
+
+    // Position selector event listeners
+    const positionOptions = content.querySelectorAll('[data-position]');
+    positionOptions.forEach(option => {
+      option.addEventListener('click', function() {
+        const position = this.getAttribute('data-position');
+        
+        // Remove active class from all options
+        positionOptions.forEach(opt => opt.classList.remove('active'));
+        
+        // Add active class to clicked option
+        this.classList.add('active');
+        
+        // Save position to localStorage
+        localStorage.setItem('menubarPosition', position);
+        
+        // Apply menubar settings
+        applyMenubarSettings();
+      });
+    });
+
+    // Apply input mode function
+    function applyInputMode(mode) {
+      const calculator = document.querySelector('.calculator');
+      const buttons = calculator.querySelectorAll('.btn');
+      
+      // Reset all input methods first
+      buttons.forEach(btn => {
+        btn.style.pointerEvents = 'auto'; // Enable mouse/touch
+        btn.tabIndex = '0'; // Enable keyboard
+      });
+      
+      // Apply mode-specific restrictions
+      switch(mode) {
+        case 'mixed':
+          // All inputs work - nothing to disable
+          break;
+          
+        case 'keyboard':
+          // Disable mouse/touch
+          buttons.forEach(btn => {
+            btn.style.pointerEvents = 'none';
+          });
+          break;
+          
+        case 'mouse':
+          // Disable keyboard
+          buttons.forEach(btn => {
+            btn.tabIndex = '-1';
+          });
+          break;
+          
+        case 'touch':
+          // Check if in landscape mode
+          const isLandscape = window.innerWidth > window.innerHeight;
+          if (isLandscape) {
+            // Disable keyboard and mouse in landscape mode
+            buttons.forEach(btn => {
+              btn.style.pointerEvents = 'none';
+              btn.tabIndex = '-1';
+            });
+          }
+          break;
+      }
+    }
+
+    // Apply current input mode on settings open
+    applyInputMode(currentInputMode);
+    
+    // Apply menubar settings on settings open
+    applyMenubarSettings();
+
+    // Add window resize listener for touch mode landscape behavior
+    window.addEventListener('resize', () => {
+      const currentMode = localStorage.getItem('calculatorInputMode') || 'mixed';
+      if (currentMode === 'touch') {
+        applyInputMode('touch');
+      }
+      
+      // Also apply menubar settings on resize for auto-hide behavior
+      applyMenubarSettings();
+    });
+
+    // Removed click outside to close - only close button works
   }
+
+  // Apply menubar settings function (global)
+  function applyMenubarSettings() {
+    const menuBar = document.getElementById('mac-menu-bar');
+    if (!menuBar) return;
+
+    const menubarEnabled = localStorage.getItem('menubarEnabled') !== 'false';
+    const menubarCompact = localStorage.getItem('menubarCompact') === 'true';
+    const menubarPosition = localStorage.getItem('menubarPosition') || 'top';
+
+    // Apply enabled setting - show in landscape, hide in portrait
+    const isLandscape = window.innerWidth > window.innerHeight;
+    if (menubarEnabled && isLandscape) {
+      menuBar.style.display = 'flex';
+    } else {
+      menuBar.style.display = 'none';
+    }
+
+    // Apply position
+    // Remove all position classes first
+    menuBar.classList.remove('position-top', 'position-bottom', 'position-left', 'position-right');
+    // Add the current position class
+    menuBar.classList.add(`position-${menubarPosition}`);
+
+    // Enhanced compact mode
+    if (menubarCompact) {
+      // Reduce menubar height/width based on position
+      if (menubarPosition === 'left' || menubarPosition === 'right') {
+        menuBar.style.width = '40px';
+        menuBar.style.minWidth = '40px';
+      } else {
+        menuBar.style.height = '24px';
+        menuBar.style.minHeight = '24px';
+      }
+      
+      // Smaller font sizes
+      menuBar.style.fontSize = '11px';
+      
+      // Reduce padding in menu bar content
+      const menuBarContent = menuBar.querySelector('.menu-bar-content');
+      if (menuBarContent) {
+        if (menubarPosition === 'left' || menubarPosition === 'right') {
+          menuBarContent.style.padding = '4px 0';
+        } else {
+          menuBarContent.style.padding = '0 8px';
+          menuBarContent.style.height = '24px';
+        }
+      }
+      
+      // Smaller menu items
+      const menuItems = menuBar.querySelectorAll('.menu-item');
+      menuItems.forEach(item => {
+        item.style.fontSize = '11px';
+        if (menubarPosition === 'left' || menubarPosition === 'right') {
+          item.style.padding = '6px 4px';
+          item.style.writingMode = 'vertical-rl';
+        } else {
+          item.style.padding = '4px 6px';
+        }
+      });
+      
+      // Compact status icons
+      const statusIcons = menuBar.querySelectorAll('.status-icon');
+      statusIcons.forEach(icon => {
+        icon.style.transform = 'scale(0.8)';
+        icon.style.margin = menubarPosition === 'left' || menubarPosition === 'right' ? '2px 0' : '0 2px';
+      });
+      
+      // Smaller app logo
+      const appLogo = menuBar.querySelector('.app-logo img');
+      if (appLogo) {
+        appLogo.style.width = '12px';
+        appLogo.style.height = '12px';
+      }
+      
+      // Compact clock
+      const menuClock = menuBar.querySelector('.menu-clock');
+      if (menuClock) {
+        menuClock.style.fontSize = '10px';
+        if (menubarPosition === 'left' || menubarPosition === 'right') {
+          menuClock.style.writingMode = 'vertical-rl';
+          menuClock.style.margin = '4px 0';
+        } else {
+          menuClock.style.margin = '0 4px';
+        }
+      }
+      
+      // Add compact mode class for CSS targeting
+      menuBar.classList.add('compact-mode');
+      
+    } else {
+      // Reset to normal size
+      menuBar.style.height = '';
+      menuBar.style.minHeight = '';
+      menuBar.style.width = '';
+      menuBar.style.minWidth = '';
+      menuBar.style.fontSize = '';
+      
+      const menuBarContent = menuBar.querySelector('.menu-bar-content');
+      if (menuBarContent) {
+        menuBarContent.style.padding = '';
+        menuBarContent.style.height = '';
+      }
+      
+      // Reset menu items
+      const menuItems = menuBar.querySelectorAll('.menu-item');
+      menuItems.forEach(item => {
+        item.style.fontSize = '';
+        item.style.padding = '';
+        item.style.writingMode = '';
+      });
+      
+      // Reset status icons
+      const statusIcons = menuBar.querySelectorAll('.status-icon');
+      statusIcons.forEach(icon => {
+        icon.style.transform = '';
+        icon.style.margin = '';
+      });
+      
+      // Reset app logo
+      const appLogo = menuBar.querySelector('.app-logo img');
+      if (appLogo) {
+        appLogo.style.width = '';
+        appLogo.style.height = '';
+      }
+      
+      // Reset clock
+      const menuClock = menuBar.querySelector('.menu-clock');
+      if (menuClock) {
+        menuClock.style.fontSize = '';
+        menuClock.style.margin = '';
+        menuClock.style.writingMode = '';
+      }
+      
+      // Remove compact mode class
+      menuBar.classList.remove('compact-mode');
+    }
+
+    // Clean up any remaining event listeners
+    removeAutoHideScroll(menuBar);
+    removeHideOnClick(menuBar);
+  }
+
+  // Auto-hide on scroll functionality
+  function setupAutoHideScroll(menuBar) {
+    let scrollTimeout;
+    let lastScrollY = 0;
+    
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY || document.documentElement.scrollTop;
+      
+      if (currentScrollY > lastScrollY && currentScrollY > 50) {
+        // Scrolling down - hide menubar
+        menuBar.style.transform = 'translateY(-100%)';
+        menuBar.style.transition = 'transform 0.3s ease';
+      } else {
+        // Scrolling up or at top - show menubar
+        menuBar.style.transform = 'translateY(0)';
+      }
+      
+      lastScrollY = currentScrollY;
+      
+      // Clear existing timeout
+      clearTimeout(scrollTimeout);
+      // Show menubar after scrolling stops
+      scrollTimeout = setTimeout(() => {
+        menuBar.style.transform = 'translateY(0)';
+      }, 1000);
+    };
+
+    // Remove existing listener if any
+    removeAutoHideScroll(menuBar);
+    
+    // Add new listener
+    menuBar._scrollHandler = handleScroll;
+    window.addEventListener('scroll', handleScroll, { passive: true });
+  }
+
+  function removeAutoHideScroll(menuBar) {
+    if (menuBar._scrollHandler) {
+      window.removeEventListener('scroll', menuBar._scrollHandler);
+      menuBar._scrollHandler = null;
+    }
+    menuBar.style.transform = '';
+    menuBar.style.transition = '';
+  }
+
+  // Hide on click outside functionality
+  function setupHideOnClick(menuBar) {
+    const handleClickOutside = (e) => {
+      if (!menuBar.contains(e.target) && !e.target.closest('.menu-dropdown, .menu-submenu')) {
+        // Close any open dropdowns
+        const dropdown = document.getElementById('menu-dropdown');
+        const submenus = document.querySelectorAll('.menu-submenu');
+        
+        if (dropdown) dropdown.style.display = 'none';
+        submenus.forEach(submenu => submenu.remove());
+      }
+    };
+
+    // Remove existing listener if any
+    removeHideOnClick(menuBar);
+    
+    // Add new listener
+    menuBar._clickHandler = handleClickOutside;
+    document.addEventListener('click', handleClickOutside);
+  }
+
+  function removeHideOnClick(menuBar) {
+    if (menuBar._clickHandler) {
+      document.removeEventListener('click', menuBar._clickHandler);
+      menuBar._clickHandler = null;
+    }
+  }
+
+  function showDocumentationWindow() {
+  showMacOSWindow('Documentation', `
+    <div class="documentation-container">
+      <div class="documentation-grid">
+        <!-- Color Palettes Section -->
+        <div class="documentation-card" data-action="color-palettes">
+          <div class="doc-icon">🎨</div>
+          <div class="doc-title">Color Palettes</div>
+          <div class="doc-subtitle">Preview</div>
+        </div>
+        
+        <!-- Color Codes Section -->
+        <div class="documentation-card" data-action="color-codes">
+          <div class="doc-icon">📋</div>
+          <div class="doc-title">Color Codes</div>
+          <div class="doc-subtitle">Palette Codes</div>
+        </div>
+        
+        <!-- Source Section -->
+        <div class="documentation-card" data-action="source">
+          <div class="doc-icon">🌐</div>
+          <div class="doc-title">Source</div>
+          <div class="doc-subtitle">Original Webpage</div>
+        </div>
+      </div>
+    </div>
+  `);
+  
+  // Add click handlers to the documentation cards
+  setTimeout(() => {
+    const docCards = document.querySelectorAll('.documentation-card');
+    docCards.forEach(card => {
+      card.addEventListener('click', function() {
+        const action = this.dataset.action;
+        handleDocumentationAction(action);
+      });
+    });
+  }, 100);
+}
+
+function handleDocumentationAction(action) {
+  switch(action) {
+    case 'color-palettes':
+      showColorPalettes();
+      break;
+    case 'color-codes':
+      showColorCodes();
+      break;
+    case 'source':
+      showSource();
+      break;
+  }
+}
+
+function showColorPalettes() {
+  showMacOSWindow('Color Palettes', `
+    <div class="color-palettes-container">
+      <div class="palettes-grid" id="palettesGrid">
+        <!-- Images will be loaded here -->
+      </div>
+    </div>
+  `);
+  
+  // Load preview images
+  const palettesGrid = document.getElementById('palettesGrid');
+  const previewPath = 'App Data/Features/Aesthetic Settings/Themes [Powered by Figma]/Color Combinations/Preview/';
+  
+  // Load common image formats
+  const imageExtensions = ['.png', '.jpg', '.jpeg', '.gif'];
+  let loadedImages = 0;
+  
+  imageExtensions.forEach(ext => {
+    for (let i = 1; i <= 20; i++) {
+      const img = document.createElement('img');
+      img.src = previewPath + i + ext;
+      img.className = 'palette-preview';
+      img.onerror = () => {}; // Skip if not found
+      img.onload = () => {
+        palettesGrid.appendChild(img);
+        loadedImages++;
+      };
+    }
+  });
+}
+
+function showColorCodes() {
+  showMacOSWindow('Color Codes', `
+    <div class="color-codes-container">
+      <div class="codes-list" id="codesList">
+        <!-- TXT files will be loaded here -->
+      </div>
+    </div>
+  `);
+  
+  // Load palette codes
+  const codesList = document.getElementById('codesList');
+  const codesPath = 'App Data/Features/Aesthetic Settings/Themes [Powered by Figma]/Color Combinations/Palette Codes/';
+  
+  // Common theme names to load
+  const themeNames = [
+    'Alchemical Reaction', 'Autumn Leaves', 'Autumn Orchard', 'Beachfront Views',
+    'Blooming Romance', 'Blue Eclipse', 'Burgundy Elegance', 'Cherry Blossom',
+    'Cobalt Dreams', 'Coral Sunset', 'Crystal Clear', 'Cyber Neon',
+    'Deep Ocean', 'Desert Mirage', 'Emerald Forest', 'Enchanted Purple',
+    'Forest Rain', 'Frozen Tundra', 'Golden Hour', 'Graphite Professional',
+    'Halloween Night', 'Hollow', 'Lavender Dreams', 'Mint Fresh',
+    'Monochrome', 'Neon Lights', 'Northern Lights', 'Ocean Breeze',
+    'Peach Parfait', 'Pixel Art', 'Purple Rain', 'Rainbow Spectrum',
+    'Rose Gold', 'Ruby Red', 'Sage Green', 'Sky Blue',
+    'Solar Flare', 'Space Black', 'Spring Meadow', 'Steel Gray',
+    'Summer Citrus', 'Sunset Orange', 'Thunder Purple', 'Tropical Paradise',
+    'Twilight Zone', 'Urban Gray', 'Violet Mist', 'Winter Frost'
+  ];
+  
+  themeNames.forEach(themeName => {
+    const codeItem = document.createElement('div');
+    codeItem.className = 'code-item';
+    codeItem.innerHTML = `
+      <div class="code-title">${themeName}</div>
+      <div class="code-content">Loading...</div>
+    `;
+    codesList.appendChild(codeItem);
+    
+    // Try to load the corresponding text file
+    fetch(codesPath + themeName.replace(/\s+/g, '_') + '.txt')
+      .then(response => response.text())
+      .then(content => {
+        codeItem.querySelector('.code-content').textContent = content;
+      })
+      .catch(() => {
+        codeItem.querySelector('.code-content').textContent = 'File not found';
+      });
+  });
+}
+
+function showSource() {
+  showMacOSWindow('Source', `
+    <div class="source-container">
+      <div class="source-webpage" id="sourceWebpage">
+        <!-- MHTML content will be loaded here -->
+      </div>
+      <div class="source-actions">
+        <button class="macos-btn primary" id="openInBrowser">
+          <i class="fas fa-external-link-alt"></i>
+          Open in Browser
+        </button>
+      </div>
+    </div>
+  `);
+  
+  // Load the original webpage
+  const sourceWebpage = document.getElementById('sourceWebpage');
+  const webpagePath = 'App Data/Features/Aesthetic Settings/Themes [Powered by Figma]/Source/Original Webpage.mhtml';
+  
+  // Try to load the MHTML file
+  fetch(webpagePath)
+    .then(response => response.text())
+    .then(content => {
+      sourceWebpage.innerHTML = `
+        <iframe src="data:text/html;charset=utf-8,${encodeURIComponent(content)}" 
+                style="width: 100%; height: 400px; border: none; border-radius: 8px;">
+        </iframe>
+      `;
+    })
+    .catch(() => {
+      sourceWebpage.innerHTML = '<div class="error-message">Source webpage not found</div>';
+    });
+  
+  // Handle open in browser button
+  document.getElementById('openInBrowser').addEventListener('click', () => {
+    const urlPath = 'App Data/Features/Aesthetic Settings/Themes [Powered by Figma]/Source/URL.txt';
+    
+    fetch(urlPath)
+      .then(response => response.text())
+      .then(url => {
+        window.open(url.trim(), '_blank');
+      })
+      .catch(() => {
+        alert('URL not found');
+      });
+  });
+}
 
   function closeSettingsMenu() {
     const settingsOverlay = document.querySelector('.settings-overlay');
@@ -3449,6 +4840,380 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function changeTheme(theme) {
     calculator.applyTheme(theme);
+  }
+
+  function initializeThemeSystem(content) {
+    // Get current theme and dark mode state
+    const currentTheme = localStorage.getItem('aestheticTheme') || 'Default';
+    const currentDarkMode = localStorage.getItem('aestheticDarkMode') === 'true';
+
+    // Set initial state
+    const darkModeToggle = content.querySelector('#darkModeToggle');
+    if (currentDarkMode) {
+      darkModeToggle.classList.add('active');
+      document.body.classList.add('dark-mode');
+    }
+
+    // Initialize search and categories
+    initializeThemeSearch(content);
+    initializeThemeCategories(content);
+    
+    // Generate theme cards for all 100 Figma themes
+    generateThemeCards(content, currentTheme);
+
+    // Set active theme card
+    const themeCards = content.querySelectorAll('.theme-card');
+    themeCards.forEach(card => {
+      if (card.dataset.theme === currentTheme) {
+        card.classList.add('active');
+      }
+    });
+
+    // Dark mode toggle event listener
+    darkModeToggle.addEventListener('click', function() {
+      const isActive = this.classList.toggle('active');
+      const isDarkMode = isActive;
+      
+      localStorage.setItem('aestheticDarkMode', isDarkMode.toString());
+      
+      if (isDarkMode) {
+        document.body.classList.add('dark-mode');
+      } else {
+        document.body.classList.remove('dark-mode');
+      }
+      
+      // Reapply current theme with new dark mode state
+      const activeTheme = content.querySelector('.theme-card.active');
+      if (activeTheme) {
+        applyFigmaTheme(activeTheme.dataset.theme, isDarkMode);
+      }
+    });
+
+    // Theme card click event listeners
+    themeCards.forEach(card => {
+      card.addEventListener('click', function() {
+        // Remove active class from all cards
+        themeCards.forEach(c => c.classList.remove('active'));
+        
+        // Add active class to clicked card
+        this.classList.add('active');
+        
+        // Apply theme
+        const themeName = this.dataset.theme;
+        const isDarkMode = darkModeToggle.classList.contains('active');
+        
+        localStorage.setItem('aestheticTheme', themeName);
+        applyFigmaTheme(themeName, isDarkMode);
+      });
+    });
+
+    // Apply initial theme immediately
+    applyFigmaTheme(currentTheme, currentDarkMode);
+    
+    // Ensure theme persists after page load
+    setTimeout(() => {
+      const activeTheme = content.querySelector('.theme-card.active');
+      if (activeTheme) {
+        const isDarkMode = darkModeToggle.classList.contains('active');
+        applyFigmaTheme(activeTheme.dataset.theme, isDarkMode);
+      }
+    }, 100);
+
+    // Tab switching functionality
+    const tabs = content.querySelectorAll('.tab');
+    tabs.forEach(tab => {
+      tab.addEventListener('click', function() {
+        // Remove active class from all tabs and sections
+        tabs.forEach(t => t.classList.remove('active'));
+        content.querySelectorAll('.settings-section').forEach(s => s.classList.remove('active'));
+        
+        // Add active class to clicked tab
+        this.classList.add('active');
+        
+        // Show corresponding section
+        const tabName = this.dataset.tab;
+        document.getElementById(`section-${tabName}`).classList.add('active');
+      });
+    });
+
+    // Documentation card click handlers
+    const docCards = content.querySelectorAll('.documentation-card');
+    docCards.forEach(card => {
+      card.addEventListener('click', function() {
+        const action = this.dataset.action;
+        handleDocumentationAction(action);
+      });
+    });
+
+    // Documentation button handler
+    const documentationBtn = content.querySelector('#documentationBtn');
+    if (documentationBtn) {
+      documentationBtn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        // Show documentation window
+        showDocumentationWindow();
+      });
+    }
+
+    // Add window resize listener to handle orientation changes
+    const handleResize = () => {
+      const activeTheme = content.querySelector('.theme-card.active');
+      if (activeTheme) {
+        const isDarkMode = darkModeToggle.classList.contains('active');
+        applyFigmaTheme(activeTheme.dataset.theme, isDarkMode);
+      }
+    };
+
+    // Add window load listener to ensure theme persistence
+    window.addEventListener('load', () => {
+      setTimeout(() => {
+        const savedTheme = localStorage.getItem('aestheticTheme') || 'Default';
+        const savedDarkMode = localStorage.getItem('aestheticDarkMode') === 'true';
+        applyFigmaTheme(savedTheme, savedDarkMode);
+      }, 50);
+    });
+
+    window.addEventListener('resize', handleResize);
+    
+    // Clean up listener when window is closed
+    const originalCloseAestheticMenu = closeAestheticMenu;
+    window.closeAestheticMenu = () => {
+      window.removeEventListener('resize', handleResize);
+      originalCloseAestheticMenu();
+    };
+  }
+
+  function initializeThemeSearch(content) {
+    const searchInput = content.querySelector('#themeSearchInput');
+    const themesGrid = content.querySelector('#themesGrid');
+    
+    // Debounce search for better performance
+    let searchTimeout;
+    searchInput.addEventListener('input', function() {
+      clearTimeout(searchTimeout);
+      const searchTerm = this.value.toLowerCase();
+      
+      searchTimeout = setTimeout(() => {
+        const themeCards = themesGrid.querySelectorAll('.theme-card');
+        
+        // Use requestAnimationFrame for smooth DOM updates
+        requestAnimationFrame(() => {
+          themeCards.forEach(card => {
+            const themeName = card.dataset.theme.toLowerCase();
+            card.style.display = themeName.includes(searchTerm) ? '' : 'none';
+          });
+        });
+      }, 100); // 100ms debounce
+    });
+  }
+
+  function initializeThemeCategories(content) {
+    const categories = content.querySelectorAll('.theme-category');
+    const themesGrid = content.querySelector('#themesGrid');
+    
+    // Use event delegation for better performance
+    categories.forEach(category => {
+      category.addEventListener('click', function() {
+        // Remove active class from all categories
+        categories.forEach(c => c.classList.remove('active'));
+        // Add active class to clicked category
+        this.classList.add('active');
+        
+        const selectedCategory = this.dataset.category;
+        const themeCards = themesGrid.querySelectorAll('.theme-card');
+        
+        // Use requestAnimationFrame for smooth DOM updates
+        requestAnimationFrame(() => {
+          themeCards.forEach(card => {
+            card.style.display = selectedCategory === 'all' ? '' : 
+              (card.dataset.category || 'all') === selectedCategory ? '' : 'none';
+          });
+        });
+      });
+    });
+  }
+
+  function generateThemeCards(content, currentTheme) {
+    const themesGrid = content.querySelector('#themesGrid');
+    if (themesGrid) {
+      // Use document fragment for better performance
+      const fragment = document.createDocumentFragment();
+      
+      Object.keys(figmaThemes).forEach(themeName => {
+        const colors = figmaThemes[themeName].colors;
+        const themeCard = document.createElement('div');
+        themeCard.className = 'theme-card';
+        themeCard.dataset.theme = themeName;
+        
+        // Determine category based on theme name and colors
+        const category = determineThemeCategory(themeName, colors);
+        themeCard.dataset.category = category;
+        
+        // Create color preview
+        const colorPreview = document.createElement('div');
+        colorPreview.className = 'theme-colors';
+        colorPreview.style.background = `linear-gradient(135deg, ${colors.join(', ')})`;
+        
+        // Create theme info
+        const themeInfo = document.createElement('div');
+        themeInfo.className = 'theme-info';
+        
+        const themeNameEl = document.createElement('div');
+        themeNameEl.className = 'theme-name';
+        themeNameEl.textContent = themeName;
+        
+        const colorCountEl = document.createElement('div');
+        colorCountEl.className = 'theme-colors-count';
+        colorCountEl.textContent = `${colors.length} colors`;
+        
+        themeInfo.appendChild(themeNameEl);
+        themeInfo.appendChild(colorCountEl);
+        
+        themeCard.appendChild(colorPreview);
+        themeCard.appendChild(themeInfo);
+        
+        if (themeName === currentTheme) {
+          themeCard.classList.add('active');
+        }
+        
+        fragment.appendChild(themeCard);
+      });
+      
+      // Single DOM operation to append all cards
+      themesGrid.appendChild(fragment);
+    }
+  }
+
+  function determineThemeCategory(themeName, colors) {
+    const name = themeName.toLowerCase();
+    
+    // Dark themes
+    if (name.includes('dark') || name.includes('midnight') || name.includes('night') || 
+        name.includes('shadow') || name.includes('black')) {
+      return 'dark';
+    }
+    
+    // Light themes
+    if (name.includes('light') || name.includes('day') || name.includes('sun') || 
+        name.includes('bright') || name.includes('white')) {
+      return 'light';
+    }
+    
+    // Colorful themes
+    if (colors.length > 4 || name.includes('rainbow') || name.includes('colorful') || 
+        name.includes('vibrant') || name.includes('neon')) {
+      return 'colorful';
+    }
+    
+    // Minimal themes
+    if (colors.length <= 3 || name.includes('minimal') || name.includes('simple') || 
+        name.includes('clean') || name.includes('mono')) {
+      return 'minimal';
+    }
+    
+    return 'all';
+  }
+
+  function applyDefaultTheme(isDarkMode) {
+    const root = document.documentElement;
+    
+    // Clear all custom CSS properties to revert to default
+    const customProps = [
+      '--theme-primary', '--theme-secondary', '--theme-accent',
+      '--calculator-bg', '--display-bg', '--display-text',
+      '--button-bg', '--button-hover', '--button-text',
+      '--operator-bg', '--operator-hover'
+    ];
+    
+    customProps.forEach(prop => root.style.removeProperty(prop));
+    
+    // Apply default iOS calculator styling
+    const calculator = document.querySelector('.calculator');
+    const display = document.querySelector('.display');
+    const buttons = document.querySelectorAll('.btn:not(.operator)');
+    const operators = document.querySelectorAll('.btn.operator');
+    
+    if (calculator) {
+      calculator.style.background = '';
+      calculator.style.borderColor = '';
+    }
+    
+    if (display) {
+      display.style.background = '';
+      display.style.color = '';
+    }
+    
+    buttons.forEach(btn => {
+      btn.style.background = '';
+      btn.style.color = '';
+      btn.style.borderColor = '';
+    });
+    
+    operators.forEach(btn => {
+      btn.style.background = '';
+      btn.style.color = '';
+      btn.style.borderColor = '';
+    });
+    
+    document.body.style.background = '';
+  }
+
+  function applyFigmaTheme(themeName, isDarkMode) {
+    // Handle Default theme - revert to original calculator styling
+    if (themeName === 'Default') {
+      applyDefaultTheme(isDarkMode);
+      return;
+    }
+
+    const theme = figmaThemes[themeName];
+    if (!theme) return;
+
+    const colors = theme.colors;
+    const root = document.documentElement;
+
+    // Check if in portrait mode
+    const isPortrait = window.innerHeight > window.innerWidth;
+    
+    // Generate CSS variables from theme colors
+    const cssVars = generateThemeCSS(themeName, colors);
+    
+    // Apply CSS custom properties
+    Object.keys(cssVars).forEach(varName => {
+      root.style.setProperty(varName, cssVars[varName]);
+    });
+
+    // Apply to calculator elements
+    const calculator = document.querySelector('.calculator');
+    if (calculator) {
+      calculator.style.background = cssVars['--calculator-bg'] || colors[0];
+      calculator.style.borderColor = cssVars['--button-hover'] || colors[1] || colors[0];
+    }
+
+    const display = document.querySelector('.display');
+    if (display) {
+      // Apply theme colors to display (result area)
+      display.style.background = cssVars['--display-bg'] || colors[1] || colors[0];
+      display.style.color = cssVars['--display-text'] || getContrastColor(colors[1] || colors[0]);
+    }
+
+    const buttons = document.querySelectorAll('.btn:not(.operator)');
+    buttons.forEach(btn => {
+      btn.style.background = cssVars['--button-bg'] || colors[0];
+      btn.style.color = cssVars['--button-text'] || getContrastColor(colors[0]);
+      btn.style.borderColor = cssVars['--button-hover'] || colors[1] || colors[0];
+    });
+
+    const operators = document.querySelectorAll('.btn.operator');
+    operators.forEach(btn => {
+      // Use a different color from the theme for operators if available
+      const operatorColor = colors[2] || colors[1] || colors[0];
+      btn.style.background = operatorColor;
+      btn.style.color = getContrastColor(operatorColor);
+      btn.style.borderColor = colors[3] || colors[2] || colors[1] || colors[0];
+    });
+
+    // Apply body background
+    document.body.style.background = cssVars['--calculator-bg'] || colors[0];
   }
 
   function showAestheticMenu() {
@@ -3474,6 +5239,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const closeAestheticMenu = () => {
       winLogic.stopPhysics();
+      winLogic.cleanup(); // Clean up window tracking
       aestheticOverlay.classList.remove('active');
       setTimeout(() => aestheticOverlay.remove(), 300);
     };
@@ -3511,12 +5277,12 @@ document.addEventListener('DOMContentLoaded', () => {
     sidebar.classList.add('settings-sidebar');
 
     const sidebarItems = [
+      { id: 'themes', icon: 'fa-swatchbook', label: 'Themes' },
       { id: 'layout', icon: 'fa-layer-group', label: 'Layout' },
       { id: 'colors', icon: 'fa-palette', label: 'Colors' },
       { id: 'buttons', icon: 'fa-square', label: 'Buttons' },
       { id: 'typography', icon: 'fa-font', label: 'Typography' },
       { id: 'effects', icon: 'fa-magic', label: 'Effects' },
-      { id: 'themes', icon: 'fa-swatchbook', label: 'Themes' },
       { id: 'advanced', icon: 'fa-cog', label: 'Advanced' }
     ];
 
@@ -3540,10 +5306,104 @@ document.addEventListener('DOMContentLoaded', () => {
       sidebar.appendChild(sbItem);
     });
 
+    // Add resizer to Aesthetic sidebar
+    addSidebarResizer(sidebar, 'aestheticSidebarWidth');
+
     // Content sections
     content.innerHTML = `
+      <!-- Themes Section -->
+      <div class="settings-section active" id="section-themes">
+        <div class="settings-section-title">Themes</div>
+        <div class="aesthetic-subsection">
+          <div class="themes-section">
+            <!-- Dark Mode Toggle and Documentation Strip -->
+            <div class="theme-controls-row">
+              <div class="theme-dark-mode-toggle">
+                <div class="toggle-info">
+                  <div class="toggle-title">Dark Mode</div>
+                  <div class="toggle-subtitle">Apply dark theme to selected theme</div>
+                </div>
+                <div class="ios-toggle" id="darkModeToggle">
+                  <div class="ios-toggle-slider"></div>
+                </div>
+              </div>
+              <div class="theme-documentation-toggle" data-action="open-documentation">
+                <div class="toggle-info">
+                  <div class="toggle-title">Documentation</div>
+                  <div class="toggle-subtitle">View color palettes and codes</div>
+                </div>
+                <button class="documentation-btn" id="documentationBtn">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                    <line x1="16" y1="13" x2="8" y2="13"></line>
+                    <line x1="16" y1="17" x2="8" y2="17"></line>
+                    <polyline points="10 9 9 9 8 9"></polyline>
+                  </svg>
+                </button>
+              </div>
+            </div>
+            
+            <!-- Themes Header -->
+            <div class="themes-header">
+              <h3 class="themes-title">Themes <span class="themes-tag">Powered by Figma</span></h3>
+              <div class="themes-count">102 Themes</div>
+            </div>
+            
+            <!-- Search Bar -->
+            <div class="themes-search">
+              <i class="fas fa-search themes-search-icon"></i>
+              <input type="text" placeholder="Search themes..." id="themeSearchInput">
+            </div>
+            
+            <!-- Theme Categories -->
+            <div class="themes-categories">
+              <div class="theme-category active" data-category="all">All</div>
+              <div class="theme-category" data-category="dark">Dark</div>
+              <div class="theme-category" data-category="light">Light</div>
+              <div class="theme-category" data-category="colorful">Colorful</div>
+              <div class="theme-category" data-category="minimal">Minimal</div>
+            </div>
+            
+            <!-- Theme Grid -->
+            <div class="themes-grid" id="themesGrid">
+              <!-- Theme cards will be dynamically generated here -->
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Documentation Section -->
+      <div class="settings-section" id="section-documentation">
+        <div class="settings-section-title">Documentation</div>
+        <div class="aesthetic-subsection">
+          <div class="documentation-grid">
+            <!-- Color Palettes Section -->
+            <div class="documentation-card" data-action="color-palettes">
+              <div class="doc-icon">🎨</div>
+              <div class="doc-title">Color Palettes</div>
+              <div class="doc-subtitle">Preview</div>
+            </div>
+            
+            <!-- Color Codes Section -->
+            <div class="documentation-card" data-action="color-codes">
+              <div class="doc-icon">📋</div>
+              <div class="doc-title">Color Codes</div>
+              <div class="doc-subtitle">Palette Codes</div>
+            </div>
+            
+            <!-- Source Section -->
+            <div class="documentation-card" data-action="source">
+              <div class="doc-icon">🌐</div>
+              <div class="doc-title">Source</div>
+              <div class="doc-subtitle">Original Webpage</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- Layout Section -->
-      <div class="settings-section active" id="section-layout">
+      <div class="settings-section" id="section-layout">
         <div class="settings-section-title">Layout</div>
         <div class="aesthetic-subsection">
           <p style="color: #8e8e93; text-align: center; padding: 40px;">Coming soon...</p>
@@ -3582,14 +5442,6 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
       </div>
 
-      <!-- Themes Section -->
-      <div class="settings-section" id="section-themes">
-        <div class="settings-section-title">Themes</div>
-        <div class="aesthetic-subsection">
-          <p style="color: #8e8e93; text-align: center; padding: 40px;">Coming soon...</p>
-        </div>
-      </div>
-
       <!-- Advanced Section -->
       <div class="settings-section" id="section-advanced">
         <div class="settings-section-title">Advanced</div>
@@ -3612,10 +5464,10 @@ document.addEventListener('DOMContentLoaded', () => {
       aestheticOverlay.classList.add('active');
     }, 10);
 
-    // Close on overlay click
-    aestheticOverlay.addEventListener('click', (e) => {
-      if (e.target === aestheticOverlay) closeAestheticMenu();
-    });
+    // Initialize theme system
+    initializeThemeSystem(content);
+
+    // Removed click outside to close - only close button works
   }
 
   function showSoundsMenu() {
@@ -3641,6 +5493,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const closeSoundsMenu = () => {
       winLogic.stopPhysics();
+      winLogic.cleanup(); // Clean up window tracking
       soundsOverlay.classList.remove('active');
       setTimeout(() => soundsOverlay.remove(), 300);
     };
@@ -3693,6 +5546,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
       sidebar.appendChild(sbItem);
     });
+
+    // Add resizer to Sounds sidebar
+    addSidebarResizer(sidebar, 'soundsSidebarWidth');
 
     // Content sections
     content.innerHTML = `
@@ -3791,10 +5647,221 @@ document.addEventListener('DOMContentLoaded', () => {
       soundsOverlay.classList.add('active');
     }, 10);
 
-    // Close on overlay click
-    soundsOverlay.addEventListener('click', (e) => {
-      if (e.target === soundsOverlay) closeSoundsMenu();
+    // Removed click outside to close - only close button works
+  }
+
+  function showKeysMenu() {
+    const keysOverlay = document.createElement('div');
+    keysOverlay.classList.add('settings-overlay');
+    if (calculator.pookieMode) keysOverlay.classList.add('pookie-active');
+
+    const keysContainer = document.createElement('div');
+    keysContainer.classList.add('settings-container');
+
+    // MacOS Title Bar
+    const titleBar = document.createElement('div');
+    titleBar.classList.add('macos-title-bar');
+
+    const trafficLights = document.createElement('div');
+    trafficLights.classList.add('macos-traffic-lights');
+    trafficLights.innerHTML = `
+      <div class="traffic-light red"></div>
+      <div class="traffic-light yellow"></div>
+      <div class="traffic-light green"></div>
+    `;
+
+    const closeKeysMenu = () => {
+      winLogic.stopPhysics();
+      winLogic.cleanup();
+      keysOverlay.classList.remove('active');
+      setTimeout(() => keysOverlay.remove(), 300);
+    };
+
+    const title = document.createElement('div');
+    title.classList.add('macos-title');
+    title.textContent = 'Key(board) Binding';
+
+    titleBar.appendChild(trafficLights);
+    titleBar.appendChild(title);
+
+    const keysIconSVG = `
+      <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="2" y="4" width="20" height="16" rx="2"></rect>
+        <path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M6 12h.01M10 12h.01M14 12h.01M18 12h.01M6 16h.01M10 16h.01M14 16h.01M18 16h.01"></path>
+      </svg>
+    `;
+
+    const winLogic = initMacOSWindow(keysContainer, keysOverlay, titleBar, closeKeysMenu, keysIconSVG);
+
+    // Keys Window Body
+    const windowBody = document.createElement('div');
+    windowBody.classList.add('settings-window-body');
+
+    // Sidebar
+    const sidebar = document.createElement('div');
+    sidebar.classList.add('settings-sidebar');
+
+    const sidebarItems = [
+      { id: 'calc', icon: 'fa-calculator', label: 'Calculator' },
+      { id: 'system', icon: 'fa-desktop', label: 'System' }
+    ];
+
+    // Content Area
+    const content = document.createElement('div');
+    content.classList.add('settings-content');
+
+    sidebarItems.forEach((item, index) => {
+      const sbItem = document.createElement('div');
+      sbItem.classList.add('sidebar-item');
+      if (index === 0) sbItem.classList.add('active');
+      sbItem.innerHTML = `<i class="fas ${item.icon}"></i><span>${item.label}</span>`;
+
+      sbItem.addEventListener('click', () => {
+        document.querySelectorAll('.sidebar-item').forEach(i => i.classList.remove('active'));
+        document.querySelectorAll('.settings-section').forEach(s => s.classList.remove('active'));
+        sbItem.classList.add('active');
+        document.getElementById(`section-${item.id}`).classList.add('active');
+      });
+
+      sidebar.appendChild(sbItem);
     });
+
+    // Content sections
+    content.innerHTML = `
+      <!-- Calc Section -->
+      <div class="settings-section active" id="section-calc">
+        <div class="settings-section-title">Calculator Key Bindings</div>
+        <div class="aesthetic-subsection">
+          <div class="macos-settings-row">
+            <div class="row-info">
+              <div class="row-title">Numbers (0-9)</div>
+              <div class="row-subtitle">Press number keys to input digits</div>
+            </div>
+            <div class="key-binding-display">
+              <kbd>0</kbd> <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> <kbd>4</kbd> <kbd>5</kbd> <kbd>6</kbd> <kbd>7</kbd> <kbd>8</kbd> <kbd>9</kbd>
+            </div>
+          </div>
+          <div class="macos-settings-row">
+            <div class="row-info">
+              <div class="row-title">Decimal Point</div>
+              <div class="row-subtitle">Insert decimal point</div>
+            </div>
+            <div class="key-binding-display">
+              <kbd>.</kbd>
+            </div>
+          </div>
+          <div class="macos-settings-row">
+            <div class="row-info">
+              <div class="row-title">Basic Operations</div>
+              <div class="row-subtitle">Addition, subtraction, multiplication, division</div>
+            </div>
+            <div class="key-binding-display">
+              <kbd>+</kbd> <kbd>-</kbd> <kbd>*</kbd> <kbd>/</kbd>
+            </div>
+          </div>
+          <div class="macos-settings-row">
+            <div class="row-info">
+              <div class="row-title">Equals / Calculate</div>
+              <div class="row-subtitle">Perform calculation</div>
+            </div>
+            <div class="key-binding-display">
+              <kbd>=</kbd> <kbd>Enter</kbd>
+            </div>
+          </div>
+          <div class="macos-settings-row">
+            <div class="row-info">
+              <div class="row-title">Clear</div>
+              <div class="row-subtitle">Clear calculator display</div>
+            </div>
+            <div class="key-binding-display">
+              <kbd>Escape</kbd> <kbd>Backspace</kbd>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- System Section -->
+      <div class="settings-section" id="section-system">
+        <div class="settings-section-title">System Key Bindings</div>
+        <div class="aesthetic-subsection">
+          <div class="macos-settings-row">
+            <div class="row-info">
+              <div class="row-title">Menu Bar</div>
+              <div class="row-subtitle">Toggle main menu sidebar</div>
+            </div>
+            <div class="key-binding-display">
+              <kbd>TAB</kbd>
+            </div>
+          </div>
+          <div class="macos-settings-row">
+            <div class="row-info">
+              <div class="row-title">Confirm</div>
+              <div class="row-subtitle">Confirm button for popups and options</div>
+            </div>
+            <div class="key-binding-display">
+              <kbd>Enter</kbd> <kbd>Spacebar</kbd>
+            </div>
+          </div>
+          <div class="macos-settings-row">
+            <div class="row-info">
+              <div class="row-title">Config</div>
+              <div class="row-subtitle">Open System Config window</div>
+            </div>
+            <div class="key-binding-display">
+              <kbd>C</kbd>
+            </div>
+          </div>
+          <div class="macos-settings-row">
+            <div class="row-info">
+              <div class="row-title">History</div>
+              <div class="row-subtitle">View calculation history</div>
+            </div>
+            <div class="key-binding-display">
+              <kbd>H</kbd>
+            </div>
+          </div>
+          <div class="macos-settings-row">
+            <div class="row-info">
+              <div class="row-title">Sounds</div>
+              <div class="row-subtitle">Open sounds settings</div>
+            </div>
+            <div class="key-binding-display">
+              <kbd>S</kbd>
+            </div>
+          </div>
+          <div class="macos-settings-row">
+            <div class="row-info">
+              <div class="row-title">Keys</div>
+              <div class="row-subtitle">Open keyboard bindings</div>
+            </div>
+            <div class="key-binding-display">
+              <kbd>K</kbd>
+            </div>
+          </div>
+          <div class="macos-settings-row">
+            <div class="row-info">
+              <div class="row-title">Toggle Pookie Mode</div>
+              <div class="row-subtitle">Activate/deactivate pookie mode</div>
+            </div>
+            <div class="key-binding-display">
+              <kbd>P</kbd>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    windowBody.appendChild(sidebar);
+    windowBody.appendChild(content);
+
+    keysContainer.appendChild(titleBar);
+    keysContainer.appendChild(windowBody);
+    keysOverlay.appendChild(keysContainer);
+    document.body.appendChild(keysOverlay);
+
+    setTimeout(() => {
+      keysOverlay.classList.add('active');
+    }, 10);
   }
 
   if (ribbonBtn) {
@@ -3876,3 +5943,586 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 });
+
+// Initialize macOS Menu Bar and integrate with landscape mode
+let macMenuBar = null;
+
+function initializeMacMenuBar() {
+  if (typeof MacOSMenuBar !== 'undefined') {
+    macMenuBar = new MacOSMenuBar({
+      appName: 'Calovetor',
+      onMenuAction: (action) => {
+        handleMenuAction(action);
+      }
+    });
+    
+    // Check for landscape mode and apply appropriate styling
+    checkLandscapeMode();
+  }
+}
+
+function handleMenuAction(action) {
+  console.log('Menu action:', action);
+  
+  // Handle specific menu actions using existing calculator functions
+  switch (action) {
+    // Apple Menu
+    case 'about':
+      // Use existing about function
+      if (typeof showAbout === 'function') {
+        showAbout();
+      } else {
+        showMacOSWindow('About Calovetor', `
+          <div style="text-align: center; padding: 20px;">
+            <h2>Calovetor</h2>
+            <p>Advanced Calculator Application</p>
+            <p>Version 1.0.0</p>
+            <p>By Samad Khan</p>
+          </div>
+        `);
+      }
+      break;
+      
+    case 'settings':
+      // Open existing settings
+      if (typeof showSettingsMenu === 'function') {
+        showSettingsMenu();
+      }
+      break;
+      
+    // File Menu  
+    case 'clear':
+      // Clear calculator
+      const currentInput = document.querySelector('.current-input');
+      if (currentInput) {
+        currentInput.textContent = '0';
+      }
+      break;
+      
+    case 'take-snapshot':
+      // Take a snapshot of the calculator
+      html2canvas(document.querySelector('.calculator')).then(canvas => {
+        const link = document.createElement('a');
+        link.download = `calculator-snapshot-${Date.now()}.png`;
+        link.href = canvas.toDataURL();
+        link.click();
+      });
+      break;
+      
+    // Edit Menu
+    case 'copy-all':
+      // Copy all values from display
+      const displayText = document.querySelector('.current-input').textContent;
+      navigator.clipboard.writeText(displayText);
+      break;
+      
+    case 'copy-answer':
+      // Copy just the answer
+      const answer = document.querySelector('.current-input').textContent;
+      navigator.clipboard.writeText(answer);
+      break;
+      
+    case 'paste-all':
+      // Paste values
+      navigator.clipboard.readText().then(text => {
+        const currentInput = document.querySelector('.current-input');
+        if (currentInput) {
+          currentInput.textContent = text;
+        }
+      });
+      break;
+      
+    case 'paste-answer':
+      // Paste as answer
+      navigator.clipboard.readText().then(text => {
+        const currentInput = document.querySelector('.current-input');
+        if (currentInput) {
+          currentInput.textContent = text;
+        }
+      });
+      break;
+      
+    // View Menu
+    case 'toggle-dark':
+      // Toggle dark mode
+      document.body.classList.toggle('dark-mode');
+      break;
+      
+    case 'toggle-pookie':
+      // Toggle pookie mode
+      const ribbonBtn = document.getElementById('ribbon-btn');
+      if (ribbonBtn) {
+        ribbonBtn.click();
+      }
+      break;
+      
+    // Theme actions
+    case 'theme-alchemical':
+    case 'theme-autumn':
+    case 'theme-autumn-orchard':
+    case 'theme-beachfront':
+    case 'theme-blooming':
+    case 'theme-blue-eclipse':
+    case 'theme-burgundy':
+    case 'theme-cherry':
+    case 'theme-cobalt':
+    case 'theme-coral':
+      // Apply specific theme
+      const themeName = action.replace('theme-', '');
+      console.log(`Applying theme: ${themeName}`);
+      // Here you would apply the specific theme
+      break;
+      
+    // History Menu
+    case 'history':
+      // Open existing history
+      if (typeof showHistory === 'function') {
+        showHistory();
+      }
+      break;
+      
+    case 'clear-history':
+      // Clear history using existing function
+      if (typeof clearHistory === 'function') {
+        clearHistory();
+      }
+      break;
+      
+    case 'export-history':
+      // Export history
+      const history = document.querySelector('.history').textContent;
+      const blob = new Blob([history], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `calculator-history-${Date.now()}.txt`;
+      a.click();
+      URL.revokeObjectURL(url);
+      break;
+      
+    // Window Menu actions
+    case 'window-history':
+    case 'window-config':
+    case 'window-aesthetics':
+    case 'window-sounds':
+    case 'window-keys':
+    case 'window-developer':
+      // Handle window submenu actions
+      const windowAction = action.replace('window-', '');
+      if (windowAction === 'history' && typeof showHistory === 'function') {
+        showHistory();
+      } else if (windowAction === 'config' && typeof showSettingsMenu === 'function') {
+        showSettingsMenu();
+      } else if (windowAction === 'aesthetics' && typeof showAestheticMenu === 'function') {
+        showAestheticMenu();
+      } else if (windowAction === 'sounds' && typeof showSoundsMenu === 'function') {
+        showSoundsMenu();
+      } else if (windowAction === 'keys' && typeof showKeysMenu === 'function') {
+        showKeysMenu();
+      } else if (windowAction === 'developer') {
+        showMacOSWindow('Developer', `
+          <div style="padding: 20px;">
+            <h3>Developer Options</h3>
+            <p>Developer tools and information</p>
+          </div>
+        `);
+      }
+      break;
+      
+    // Developer Menu
+    case 'socials':
+      showMacOSWindow('Socials', `
+        <div style="padding: 20px;">
+          <h3>Social Links</h3>
+          <p>Connect with the developer</p>
+        </div>
+      `);
+      break;
+      
+    case 'portfolio':
+      showMacOSWindow('Portfolio', `
+        <div style="padding: 20px;">
+          <h3>Portfolio</h3>
+          <p>View developer portfolio</p>
+        </div>
+      `);
+      break;
+      
+    case 'resume':
+      showMacOSWindow('Resume', `
+        <div style="padding: 20px;">
+          <h3>Resume</h3>
+          <p>Developer resume</p>
+        </div>
+      `);
+      break;
+      
+    // Existing actions from before
+    case 'fullscreen':
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen();
+      } else {
+        document.exitFullscreen();
+      }
+      break;
+      
+    case 'minimize':
+      const calculatorEl = document.querySelector('.calculator');
+      if (calculatorEl) {
+        calculatorEl.classList.add('minimized');
+        setTimeout(() => {
+          calculatorEl.classList.remove('minimized');
+        }, 2000);
+      }
+      break;
+      
+    case 'close-window':
+      if (confirm('Are you sure you want to close calculator?')) {
+        window.close();
+      }
+      break;
+      
+    case 'print':
+      window.print();
+      break;
+      
+    case 'save-page':
+      const currentInputVal = document.querySelector('.current-input').textContent;
+      const historyVal = document.querySelector('.history').textContent;
+      const data = {
+        input: currentInputVal,
+        history: historyVal,
+        timestamp: new Date().toISOString()
+      };
+      
+      const dataBlob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const dataUrl = URL.createObjectURL(dataBlob);
+      const dataA = document.createElement('a');
+      dataA.href = dataUrl;
+      dataA.download = `calculation-${Date.now()}.json`;
+      dataA.click();
+      URL.revokeObjectURL(dataUrl);
+      break;
+      
+    case 'app-help':
+      showMacOSWindow('Help', `
+        <div style="padding: 20px;">
+          <h3>Calculator Help</h3>
+          <p><strong>Basic Operations:</strong></p>
+          <ul>
+            <li>Use number buttons for digits</li>
+            <li>Use operator buttons (+, -, ×, ÷) for calculations</li>
+            <li>Press = to get results</li>
+            <li>Press AC to clear</li>
+          </ul>
+          <p><strong>Scientific Functions:</strong></p>
+          <ul>
+            <li>sin, cos, tan for trigonometry</li>
+            <li>log, ln for logarithms</li>
+            <li>√ for square root</li>
+            <li>x² for square</li>
+            <li>xʸ for power</li>
+          </ul>
+        </div>
+      `);
+      break;
+      
+    case 'shortcuts':
+      showMacOSWindow('Keyboard Shortcuts', `
+        <div style="padding: 20px;">
+          <h3>Calculator Shortcuts</h3>
+          <table style="width: 100%; border-collapse: collapse;">
+            <tr><td><strong>⌘N</strong></td><td>New Calculation</td></tr>
+            <tr><td><strong>⌘S</strong></td><td>Save Calculation</td></tr>
+            <tr><td><strong>⇧⌘S</strong></td><td>Take Snapshot</td></tr>
+            <tr><td><strong>⌘Z</strong></td><td>Undo</td></tr>
+            <tr><td><strong>⇧⌘Z</strong></td><td>Redo</td></tr>
+            <tr><td><strong>⌘C</strong></td><td>Copy All Values</td></tr>
+            <tr><td><strong>⇧⌘C</strong></td><td>Copy Answer</td></tr>
+            <tr><td><strong>⌘V</strong></td><td>Paste All Values</td></tr>
+            <tr><td><strong>⇧⌘V</strong></td><td>Paste Answer</td></tr>
+            <tr><td><strong>⌘D</strong></td><td>Toggle Dark Mode</td></tr>
+            <tr><td><strong>⌘P</strong></td><td>Toggle Pookie Mode</td></tr>
+            <tr><td><strong>⌘H</strong></td><td>Open History</td></tr>
+            <tr><td><strong>⌘+</strong></td><td>Zoom In</td></tr>
+            <tr><td><strong>⌘-</strong></td><td>Zoom Out</td></tr>
+            <tr><td><strong>⌘0</strong></td><td>Actual Size</td></tr>
+            <tr><td><strong>⌃⌘F</strong></td><td>Full Screen</td></tr>
+          </table>
+        </div>
+      `);
+      break;
+      
+    case 'contact-support':
+      showMacOSWindow('Contact Support', `
+        <div style="padding: 20px;">
+          <h3>Contact Support</h3>
+          <p>For support and feedback:</p>
+          <p><strong>Developer:</strong> Samad Khan</p>
+          <p><strong>Calculator:</strong> Calovetor</p>
+          <p>We appreciate your feedback and suggestions!</p>
+        </div>
+      `);
+      break;
+      
+    default:
+      console.log('Unhandled menu action:', action);
+  }
+}
+
+function checkLandscapeMode() {
+  const calculator = document.querySelector('.calculator');
+  const menuBar = document.getElementById('mac-menu-bar');
+  const isLandscape = window.innerWidth > window.innerHeight;
+  
+  if (isLandscape) {
+    calculator.classList.add('landscape-mode');
+  } else {
+    calculator.classList.remove('landscape-mode');
+  }
+  
+  // Apply menubar settings instead of hardcoding visibility
+  if (menuBar && typeof applyMenubarSettings === 'function') {
+    applyMenubarSettings();
+  }
+}
+
+// Initialize when DOM is loaded
+document.addEventListener('DOMContentLoaded', () => {
+  // Wait a bit for other scripts to load
+  setTimeout(initializeMacMenuBar, 100);
+  
+  // Apply menubar settings after menubar is initialized
+  setTimeout(() => {
+    if (typeof applyMenubarSettings === 'function') {
+      applyMenubarSettings();
+    }
+  }, 200);
+});
+
+// Add resize listener for landscape mode detection
+window.addEventListener('resize', () => {
+  checkLandscapeMode();
+  
+  // Update input mode for touch mode landscape behavior
+  const currentMode = localStorage.getItem('calculatorInputMode') || 'mixed';
+  if (currentMode === 'touch') {
+    applyInputMode(currentMode);
+  }
+});
+
+// Add CSS for landscape mode adjustments
+const landscapeStyles = document.createElement('style');
+landscapeStyles.textContent = `
+  .calculator.landscape-mode {
+    width: 100vw;
+    height: 100vh;
+    max-width: none;
+    max-height: none;
+    margin: 0;
+    border-radius: 0;
+    padding-top: 32px;
+  }
+  
+  .calculator:not(.landscape-mode) {
+    padding-top: 0;
+  }
+  
+  .calculator.landscape-mode .display-panel {
+    height: calc(100vh - 32px);
+  }
+  
+  .calculator.landscape-mode .buttons-panel {
+    height: calc(100vh - 32px);
+    overflow-y: auto;
+  }
+  
+  @media (max-width: 768px) {
+    .calculator.landscape-mode .buttons-panel {
+      display: flex;
+      flex-wrap: wrap;
+      align-content: flex-start;
+    }
+    
+    .calculator.landscape-mode .buttons {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 8px;
+      padding: 10px;
+    }
+    
+    .calculator.landscape-mode .btn {
+      font-size: 14px;
+      padding: 15px 10px;
+    }
+  }
+  
+  @media (max-width: 480px) {
+    .calculator.landscape-mode .buttons {
+      grid-template-columns: repeat(4, 1fr);
+    }
+    
+    .calculator.landscape-mode .btn {
+      font-size: 12px;
+      padding: 12px 8px;
+    }
+  }
+  
+  /* Ensure menu bar is always on top when visible */
+  .mac-menu-bar {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    z-index: 9999 !important;
+  }
+  
+  /* Enhanced compact mode styles */
+  .mac-menu-bar.compact-mode {
+    backdrop-filter: blur(8px);
+    /* Remove background color override to keep normal mode colors */
+  }
+  
+  .mac-menu-bar.compact-mode .menu-item {
+    transition: all 0.2s ease;
+  }
+  
+  .mac-menu-bar.compact-mode .menu-item:hover {
+    background: rgba(128, 128, 128, 0.2);
+    border-radius: 3px;
+  }
+  
+  .mac-menu-bar.compact-mode .status-icon svg {
+    transition: transform 0.2s ease;
+  }
+  
+  .mac-menu-bar.compact-mode .status-icon:hover svg {
+    transform: scale(0.9);
+  }
+  
+  .mac-menu-bar.compact-mode .menu-clock {
+    font-weight: 500;
+    letter-spacing: 0.5px;
+  }
+  
+  /* Position selector styles */
+  .position-selector {
+    display: flex;
+    gap: 8px;
+    margin-top: 4px;
+  }
+  
+  .position-option {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    background: rgba(255, 255, 255, 0.5);
+    min-width: 50px;
+  }
+  
+  .position-option:hover {
+    background: rgba(255, 255, 255, 0.8);
+    border-color: #007AFF;
+    transform: translateY(-1px);
+  }
+  
+  .position-option.active {
+    background: #007AFF;
+    border-color: #007AFF;
+    color: white;
+  }
+  
+  .position-icon {
+    font-size: 16px;
+    margin-bottom: 2px;
+  }
+  
+  .position-option span {
+    font-size: 10px;
+    font-weight: 500;
+  }
+  
+  .dark-mode .position-option {
+    background: rgba(50, 50, 50, 0.8);
+    border-color: #555;
+    color: white;
+  }
+  
+  .dark-mode .position-option:hover {
+    background: rgba(70, 70, 70, 0.9);
+    border-color: #007AFF;
+  }
+  
+  .dark-mode .position-option.active {
+    background: #007AFF;
+    border-color: #007AFF;
+    color: white;
+  }
+  
+  /* Menubar position styles */
+  .mac-menu-bar.position-top {
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: auto;
+    width: 100%;
+    height: auto;
+    flex-direction: row;
+  }
+  
+  .mac-menu-bar.position-bottom {
+    top: auto;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    height: auto;
+    flex-direction: row;
+  }
+  
+  .mac-menu-bar.position-left {
+    top: 0;
+    left: 0;
+    right: auto;
+    bottom: 0;
+    width: 60px;
+    height: 100vh;
+    flex-direction: column;
+  }
+  
+  .mac-menu-bar.position-right {
+    top: 0;
+    left: auto;
+    right: 0;
+    bottom: 0;
+    width: 60px;
+    height: 100vh;
+    flex-direction: column;
+  }
+  
+  .mac-menu-bar.position-left .menu-bar-content,
+  .mac-menu-bar.position-right .menu-bar-content {
+    flex-direction: column;
+    height: 100%;
+    padding: 10px 0;
+  }
+  
+  .mac-menu-bar.position-left .menu-bar-left,
+  .mac-menu-bar.position-right .menu-bar-left {
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .mac-menu-bar.position-left .menu-bar-right,
+  .mac-menu-bar.position-right .menu-bar-right {
+    flex-direction: column;
+    gap: 8px;
+    margin-top: auto;
+  }
+`;
+document.head.appendChild(landscapeStyles);
